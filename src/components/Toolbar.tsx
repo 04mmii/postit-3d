@@ -1,60 +1,40 @@
-import React from "react";
 import { useNotes } from "../contexts/NotesContext";
-import { COLORS } from "../utils/colors";
 
 export function Toolbar() {
   const { addNote } = useNotes();
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 12,
-        left: 12,
-        right: 12,
-        display: "flex",
-        gap: 8,
-        alignItems: "center",
-        justifyContent: "space-between",
-        fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
-        pointerEvents: "auto",
-      }}
-    >
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => addNote()} style={btnStyle}>
-          + 새 메모
-        </button>
-        <button
-          onClick={() => addNote({ color: "yellow" })}
-          style={{ ...btnStyle, background: COLORS.yellow, color: "#111" }}
-        >
-          노랑
-        </button>
-        <button
-          onClick={() => addNote({ color: "pink" })}
-          style={{ ...btnStyle, background: COLORS.pink, color: "#111" }}
-        >
-          핑크
-        </button>
-        <button
-          onClick={() => addNote({ color: "mint" })}
-          style={{ ...btnStyle, background: COLORS.mint, color: "#111" }}
-        >
-          민트
-        </button>
+    <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-auto font-sans">
+      <div className="flex gap-2">
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => addNote()}
+            className="px-3 py-2 rounded-xl shadow bg-black text-white"
+          >
+            + 새 메모
+          </button>
+          <button
+            onClick={() => addNote({ color: "yellow" })}
+            className="px-3 py-2 rounded-xl shadow bg-postit-yellow text-black"
+          >
+            노랑
+          </button>
+          <button
+            onClick={() => addNote({ color: "pink" })}
+            className="px-3 py-2 rounded-xl shadow bg-postit-pink text-black"
+          >
+            핑크
+          </button>
+          <button
+            onClick={() => addNote({ color: "mint" })}
+            className="px-3 py-2 rounded-xl shadow bg-postit-mint text-black"
+          >
+            민트
+          </button>
+        </div>
       </div>
-      <div style={{ opacity: 0.8, fontSize: 12 }}>
+      <div className="opacity-80 text-xs">
         Drag: 포스트잇 이동 • ↻: 랜덤 기울기 • 자동저장
       </div>
     </div>
   );
 }
-
-const btnStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  background: "#111",
-  color: "#fff",
-  border: "none",
-  borderRadius: 12,
-  cursor: "pointer",
-  boxShadow: "0 6px 16px rgba(0,0,0,.15)",
-};

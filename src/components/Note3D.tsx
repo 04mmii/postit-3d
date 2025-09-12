@@ -64,39 +64,42 @@ function buildNoteElement(
   deleteNote: (id: string) => void
 ) {
   const wrap = document.createElement("div");
-  wrap.style.width = "220px";
-  wrap.style.height = "220px";
-  wrap.style.background = COLORS[note.color];
-  wrap.style.borderRadius = "10px";
-  wrap.style.boxShadow = "0 12px 30px rgba(0,0,0,.25)";
-  wrap.style.padding = "14px";
-  wrap.style.display = "flex";
-  wrap.style.flexDirection = "column";
-  wrap.style.gap = "8px";
-  wrap.style.userSelect = "none";
+  wrap.className = "relative w-[220px] h-[220px] select-none";
+  wrap.style.transformStyle = "preserve-3d";
+  wrap.style.backfaceVisibility = "hidden";
+
+  // 내부 카드 래퍼 생성 (색/그림자/레이아웃)
+  const card = document.createElement("div");
+  card.dataset.role = "card";
+  card.className = [
+    "w-full",
+    "h-full",
+    "rounded-card",
+    "shadow-card",
+    "p-3",
+    "flex",
+    "flex-col",
+    "gap-2",
+  ].join(" ");
+  const colorClass: Record<Note["color"], string> = {
+    yellow: "bg-postit-yellow",
+    pink: "bg-postit-pink",
+    mint: "bg-postit-mint",
+  };
+  card.classList.add(colorClass[note.color]);
+  wrap.appendChild(card);
 
   const tape = document.createElement("div");
-  tape.style.alignSelf = "center";
-  tape.style.width = "90px";
-  tape.style.height = "20px";
-  tape.style.background = "rgba(255,255,255,.7)";
-  tape.style.boxShadow = "0 2px 8px rgba(0,0,0,.2)";
-  tape.style.borderRadius = "4px";
-  tape.style.marginTop = "-6px";
-  wrap.appendChild(tape);
+  tape.className =
+    "self-center w-[90px] h-5 bg-white/70 shadow-md rounded mt-[-6px]";
+  card.appendChild(tape);
 
   const textarea = document.createElement("textarea");
   textarea.value = note.text;
   textarea.placeholder = "할 일을 적어보세요…";
-  textarea.style.flex = "1";
-  textarea.style.border = "none";
-  textarea.style.outline = "none";
-  textarea.style.resize = "none";
-  textarea.style.background = "transparent";
-  textarea.style.fontSize = "16px";
-  textarea.style.lineHeight = "1.4";
-  textarea.style.fontFamily =
-    "'Pretendard', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto";
+  textarea.className =
+    "flex-1 border-0 outline-none resize-none bg-transparent text-[16px] leading-[1.4]";
+  card.appendChild(textarea);
   textarea.addEventListener("input", (e) => {
     const text = (e.target as HTMLTextAreaElement).value;
     updateNote(note.id, { text });
@@ -104,24 +107,21 @@ function buildNoteElement(
   textarea.addEventListener("dblclick", () => textarea.focus());
 
   const footer = document.createElement("div");
-  footer.style.display = "flex";
-  footer.style.justifyContent = "space-between";
-  footer.style.alignItems = "center";
+  footer.className = "flex items-center justify-between";
 
   const date = document.createElement("span");
   date.textContent = new Date(note.createdAt).toLocaleDateString();
-  date.style.fontSize = "12px";
-  date.style.opacity = ".7";
+  date.className = "text-[12px] opacity-70";
 
   const right = document.createElement("div");
-  right.style.display = "flex";
-  right.style.gap = "6px";
+  right.className = "flex gap-1.5";
 
   const doneBtn = document.createElement("button");
   doneBtn.dataset.role = "done";
   doneBtn.textContent = note.done ? "✅" : "⬜";
   doneBtn.title = "완료 토글";
-  styleIconButton(doneBtn);
+  doneBtn.className =
+    "w-7 h-7 rounded bg-black text-white shadow cursor-pointer";
   doneBtn.addEventListener("click", () =>
     updateNote(note.id, { done: !note.done })
   );
@@ -129,7 +129,8 @@ function buildNoteElement(
   const rotateBtn = document.createElement("button");
   rotateBtn.textContent = "↻";
   rotateBtn.title = "살짝 회전";
-  styleIconButton(rotateBtn);
+  rotateBtn.className =
+    "w-7 h-7 rounded bg-black text-white shadow cursor-pointer";
   rotateBtn.addEventListener("click", () =>
     updateNote(note.id, {
       rotationZ: THREE.MathUtils.degToRad(Math.random() * 12 - 6),
@@ -139,7 +140,8 @@ function buildNoteElement(
   const delBtn = document.createElement("button");
   delBtn.textContent = "🗑️";
   delBtn.title = "삭제";
-  styleIconButton(delBtn);
+  delBtn.className =
+    "w-7 h-7 rounded bg-black text-white shadow cursor-pointer";
   delBtn.addEventListener("click", () => deleteNote(note.id));
 
   right.appendChild(doneBtn);

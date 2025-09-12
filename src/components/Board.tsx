@@ -5,21 +5,21 @@ import { useThree } from "../contexts/ThreeContext";
 export function Board() {
   const { scene } = useThree();
   const boardRef = useRef<CSS3DObject | null>(null);
-  const boardSize = { width: 1200, height: 700 };
 
   useEffect(() => {
     const el = document.createElement("div");
-    el.style.position = "relative";
-    el.style.width = `${boardSize.width}px`;
-    el.style.height = `${boardSize.height}px`;
-    el.style.background = "#E5D0A6"; // cork-ish
-    el.style.borderRadius = "24px";
-    el.style.border = "8px solid #b58b52";
-    el.style.boxShadow =
-      "0 30px 80px rgba(0,0,0,.25) inset, 0 10px 40px rgba(0,0,0,.15)";
-    el.style.backgroundImage =
-      "radial-gradient(rgba(0,0,0,.05) 1px, transparent 1px)";
-    el.style.backgroundSize = "10px 10px";
+    el.className = [
+      "relative",
+      "w-[1200px]",
+      "h-[700px]",
+      "rounded-board",
+      "border-[8px]",
+      "border-postit-frame",
+      "shadow-board",
+      "bg-postit-cork",
+      "bg-[radial-gradient(rgba(0,0,0,.05)_1px,transparent_1px)]",
+      "[background-size:10px_10px]",
+    ].join(" ");
 
     const guides = document.createElement("div");
     guides.style.position = "absolute";

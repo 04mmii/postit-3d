@@ -6,14 +6,7 @@ import { Toolbar } from "./components/Toolbar";
 
 export default function App() {
   return (
-    <div
-      style={{
-        position: "relative",
-        width: "100%",
-        height: "100vh",
-        background: "linear-gradient(180deg,#f7f4ed,#efe6d6)",
-      }}
-    >
+    <div className="relative w-full h-screen bg-[linear-gradient(180deg,#f7f4ed,#efe6d6)]">
       <NotesProvider>
         <ThreeRoot>
           <Board />
