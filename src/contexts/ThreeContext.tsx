@@ -16,14 +16,14 @@ export type ThreeCtx = {
   mountEl: HTMLDivElement | null;
 };
 
-const ThreeContext = createContext<ThreeCtx | null>(null);
+const Ctx = createContext<ThreeCtx | null>(null);
 export const useThree = () => {
-  const ctx = useContext(ThreeContext);
-  if (!ctx) throw new Error("useThree must be used inside <ThreeRoot>");
-  return ctx;
+  const v = useContext(Ctx);
+  if (!v) throw new Error("useThree must be used inside <ThreeRoot>");
+  return v;
 };
 
-export function ThreeRoot({ children }: { children: React.ReactNode }) {
+export const ThreeRoot = ({ children }: { children: React.ReactNode }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [ctx, setCtx] = useState<ThreeCtx | null>(null);
 
@@ -73,9 +73,7 @@ export function ThreeRoot({ children }: { children: React.ReactNode }) {
 
   return (
     <div ref={mountRef} style={{ position: "absolute", inset: 0 }}>
-      {ctx && (
-        <ThreeContext.Provider value={ctx}>{children}</ThreeContext.Provider>
-      )}
+      {ctx && <Ctx.Provider value={ctx}>{children}</Ctx.Provider>}
     </div>
   );
-}
+};
