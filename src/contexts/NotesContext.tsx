@@ -1,53 +1,63 @@
-import React, {
+import {
   createContext,
   useCallback,
   useContext,
   useMemo,
   useState,
 } from "react";
-import * as THREE from "three";
+import type { ReactNode } from "react";
 import type { Note } from "../types/note";
 
 const LS_KEY = "postit-notes-v1";
+
 const loadNotes = (): Note[] => {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 };
+
 const saveNotes = (notes: Note[]) => {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(notes));
-  } catch {}
+  } catch {
+    /* ignore */
+  }
 };
 
 export type NotesCtx = {
   notes: Note[];
   addNote: (partial?: Partial<Note>) => void;
   updateNote: (id: string, patch: Partial<Note>) => void;
-  deleteNote: (id: string) => void;
+  removeNote: (id: string) => void; // ← 이름 통일
 };
 
 const Ctx = createContext<NotesCtx | null>(null);
+
 export const useNotes = () => {
   const v = useContext(Ctx);
-  if (!v) throw new Error("useNotes inside provider");
+  if (!v) throw new Error("useNotes must be used inside <NotesProvider>");
   return v;
 };
 
+// utils
 const uid = () => Math.random().toString(36).slice(2, 9);
 const rand = (min: number, max: number) => Math.random() * (max - min) + min;
+const degToRad = (d: number) => (d * Math.PI) / 180;
 
-export function NotesProvider({ children }: { children: React.ReactNode }) {
+export const NotesProvider = ({ children }: { children: ReactNode }) => {
   const [notes, setNotes] = useState<Note[]>(() => loadNotes());
+
+  // setNotes + 저장을 한 번에
   const persist = useCallback(
-    (up: (prev: Note[]) => Note[]) =>
-      setNotes((p) => {
-        const n = up(p);
-        saveNotes(n);
-        return n;
+    (updater: (prev: Note[]) => Note[]) =>
+      setNotes((prev) => {
+        const next = updater(prev);
+        saveNotes(next);
+        return next;
       }),
     []
   );
@@ -63,7 +73,7 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
           y: rand(-200, 200),
           z: 0,
         },
-        rotationZ: partial?.rotationZ ?? THREE.MathUtils.degToRad(rand(-6, 6)),
+        rotationZ: partial?.rotationZ ?? degToRad(rand(-6, 6)),
         createdAt: Date.now(),
         done: false,
       };
@@ -81,7 +91,7 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
 
-  const deleteNote = useCallback(
+  const removeNote = useCallback(
     (id: string) => {
       persist((prev) => prev.filter((n) => n.id !== id));
     },
@@ -89,8 +99,9 @@ export function NotesProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ notes, addNote, updateNote, deleteNote }),
-    [notes, addNote, updateNote, deleteNote]
+    () => ({ notes, addNote, updateNote, removeNote }),
+    [notes, addNote, updateNote, removeNote]
   );
+
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
+};

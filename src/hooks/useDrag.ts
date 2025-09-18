@@ -33,7 +33,14 @@ export const useDrag = ({ camera, surface, onDrop }: Params) => {
     const onDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName?.toLowerCase();
-      if (tag === "textarea" || t?.isContentEditable) return; // 입력 중 드래그 방지
+
+      // ⬇️ 드래그 무시 조건 확대
+      const noDrag =
+        tag === "textarea" ||
+        t?.isContentEditable ||
+        t?.closest("[data-nodrag]"); // ⬅️ 버튼/아이콘 영역
+
+      if (noDrag) return;
 
       e.preventDefault();
       el.style.cursor = "grabbing";
