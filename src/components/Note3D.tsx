@@ -28,6 +28,9 @@ const buildNoteElement = (note: Note) => {
     width: "220px",
     height: "220px",
     // userSelect: "none",
+    transform: "translateZ(0)", // ✅ 레이어 승격
+    WebkitFontSmoothing: "antialiased", // 가독성(선택)
+    willChange: "transform", // 힌트(선택)
     transformStyle: "preserve-3d",
     backfaceVisibility: "hidden",
   });
@@ -212,14 +215,6 @@ export const Note3D = ({ note, onObjectReady }: Props) => {
     const onBlur = () => flush();
     obj.rotation.set(0, 0, rotationRef.current);
 
-    const onKeyDown = (e: KeyboardEvent) => e.stopPropagation();
-
-    textarea.addEventListener("compositionstart", onCompositionStart);
-    textarea.addEventListener("compositionend", onCompositionEnd);
-    textarea.addEventListener("input", onInput);
-    textarea.addEventListener("blur", onBlur);
-    textarea.addEventListener("keydown", onKeyDown);
-
     return () => {
       textarea.removeEventListener("pointerdown", stopBub, {
         capture: true,
@@ -232,7 +227,6 @@ export const Note3D = ({ note, onObjectReady }: Props) => {
       textarea.removeEventListener("compositionend", onCompositionEnd);
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("blur", onBlur);
-      textarea.removeEventListener("keydown", onKeyDown);
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [note.id, textarea, updateNote]);
