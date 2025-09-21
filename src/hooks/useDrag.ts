@@ -46,6 +46,17 @@ export const useDrag = ({ camera, surface, onDrop }: Params) => {
       el.style.cursor = "grabbing";
       dragging = obj;
 
+      // ⬇️ 드래그 중 연출
+      el.classList.add("dragging");
+      const card = el.querySelector(
+        '[data-role="card"]'
+      ) as HTMLDivElement | null;
+      if (card) {
+        card.style.transition = "transform .08s ease, box-shadow .08s ease";
+        card.style.transform = "translateZ(0) scale(1.03)";
+      }
+      el.style.filter = "drop-shadow(0 24px 38px rgba(0,0,0,.28))";
+
       // 카메라가 바라보는 평면을, 현재 오브젝트 위치에 생성
       camera.getWorldDirection(normal);
       plane.setFromNormalAndCoplanarPoint(normal, obj.position);
@@ -78,8 +89,18 @@ export const useDrag = ({ camera, surface, onDrop }: Params) => {
 
       const obj = dragging;
       dragging = null;
-      if (!obj) return;
 
+      // ⬇️ 드래그 종료 시 원복 + 살짝 바운스 느낌
+      el.classList.remove("dragging");
+      const card = el.querySelector(
+        '[data-role="card"]'
+      ) as HTMLDivElement | null;
+      if (card) {
+        card.style.transform = "translateZ(0) scale(1.00)";
+      }
+      el.style.filter = "drop-shadow(0 18px 30px rgba(0,0,0,.22))";
+
+      if (!obj) return;
       obj.position.z = 0; // 원래 높이로
       onDrop?.(obj); // 좌표 저장 등 콜백
     };
