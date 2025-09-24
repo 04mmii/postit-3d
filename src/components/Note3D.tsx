@@ -12,14 +12,14 @@ type Props = {
 /** 색상 헬퍼 */
 const colorOf = (c: any) =>
   c === "yellow"
-    ? "#FFEB74"
+    ? "#FFF9C4" // 파스텔 옐로우
     : c === "pink"
-      ? "#FFC3D1"
+      ? "#F8BBD0" // 파스텔 핑크
       : c === "mint"
-        ? "#BFF3E0"
-        : "#FFEB74";
+        ? "#B2EBF2" // 파스텔 민트
+        : "#FFF9C4";
 
-/** 내부 카드 DOM 생성 (루트 transform은 건드리지 않음) */
+/** DOM 생성 */
 const buildNoteElement = (note: Note) => {
   const wrap = document.createElement("div");
   wrap.className = "note3d-root";
@@ -27,56 +27,72 @@ const buildNoteElement = (note: Note) => {
     position: "relative",
     width: "220px",
     height: "220px",
-    transform: "translateZ(0)", // ✅ 레이어 승격
-    WebkitFontSmoothing: "antialiased", // 가독성(선택)
-    willChange: "transform", // 힌트(선택)
+    transform: "translateZ(0)",
+    WebkitFontSmoothing: "antialiased",
+    willChange: "transform",
     transformStyle: "preserve-3d",
     backfaceVisibility: "hidden",
-    filter: "drop-shadow(0 18px 30px rgba(0,0,0,.22))",
+    boxShadow: `
+      0 4px 6px rgba(0,0,0,.1),
+      0 10px 15px rgba(0,0,0,.15),
+      0 18px 30px rgba(0,0,0,.2)
+    `,
+    transition: "transform .2s ease, box-shadow .2s ease",
   });
 
-  // 카드
   const card = document.createElement("div");
-  card.dataset.role = "card";
   Object.assign(card.style, {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+  });
+
+  const cardInner = document.createElement("div");
+  Object.assign(cardInner.style, {
     width: "100%",
     height: "100%",
     borderRadius: "10px 0 0 0",
     padding: "14px",
+    background: colorOf(note.color),
+    boxShadow: "0 18px 30px rgba(0,0,0,.22)",
+    transition: "transform .25s ease",
     display: "flex",
     flexDirection: "column",
     gap: "8px",
-    background: colorOf(note.color),
-    backgroundImage:
-      "linear-gradient(180deg, rgba(255,255,255,.45), rgba(255,255,255,0))," +
-      "radial-gradient(rgba(0,0,0,0.035) 1px, transparent 1px)",
-    backgroundSize: "auto, 3px 3px",
-    backgroundBlendMode: "multiply",
-    boxShadow:
-      "inset 0 1px 0 rgba(0,0,0,.06), inset 0 -8px 20px rgba(0,0,0,.06), 0 18px 30px rgba(0,0,0,.22)",
-    filter: "contrast(1.01) saturate(.98)",
   });
+  card.appendChild(cardInner);
+
+  // ✅ 그림자 (위쪽 잘라서 없음)
+  const shadow = document.createElement("div");
+  Object.assign(shadow.style, {
+    position: "absolute",
+    inset: "0",
+    borderRadius: "10px 0 0 0",
+    pointerEvents: "none",
+    boxShadow: "0 18px 30px rgba(0,0,0,.22)",
+    webkitMaskImage: "linear-gradient(#0000 0 26px, #000 26px)",
+    maskImage: "linear-gradient(#0000 0 26px, #000 26px)",
+    zIndex: "0",
+  });
+  wrap.appendChild(shadow);
   wrap.appendChild(card);
 
-  // 테이프
+  // ✅ 테이프
   const tape = document.createElement("div");
   Object.assign(tape.style, {
     alignSelf: "center",
     width: "90px",
     height: "20px",
-    background:
-      "linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.65))",
-    boxShadow: "0 2px 8px rgba(0,0,0,.2)",
-    borderRadius: "4px 0 0 0",
+    background: "linear-gradient(180deg, #fff, rgba(255,255,255,.6))",
+    boxShadow: "0 2px 4px rgba(0,0,0,.2)",
+    opacity: ".85",
+    borderRadius: "3px",
     marginTop: "-6px",
-    /* 반투명+multiply로 종이 위에 붙은 느낌 */
     mixBlendMode: "multiply",
-    opacity: ".9",
-    transform: "rotate(" + ((Math.random() - 0.5) * 4).toFixed(2) + "deg)",
+    transform: `rotate(${((Math.random() - 0.5) * 4).toFixed(2)}deg)`,
   });
-  card.appendChild(tape);
 
-  // 텍스트 입력
+  // ✅ textarea
   const textarea = document.createElement("textarea");
   textarea.value = note.text ?? "";
   textarea.placeholder = "할 일을 적어보세요…";
@@ -91,9 +107,8 @@ const buildNoteElement = (note: Note) => {
     fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
     userSelect: "text",
   });
-  card.appendChild(textarea);
 
-  // 푸터
+  // ✅ footer
   const footer = document.createElement("div");
   Object.assign(footer.style, {
     display: "flex",
@@ -108,7 +123,6 @@ const buildNoteElement = (note: Note) => {
   Object.assign(date.style, { fontSize: "12px", opacity: ".7" });
   footer.appendChild(date);
 
-  // 우측 액션
   const right = document.createElement("div");
   Object.assign(right.style, { display: "flex", gap: "6px" });
 
@@ -117,50 +131,59 @@ const buildNoteElement = (note: Note) => {
     btn.type = "button";
     btn.textContent = label;
     btn.title = title;
-    btn.dataset.nodrag = "1"; // 드래그 훅에서 무시할 표식
+    btn.dataset.nodrag = "1";
     Object.assign(btn.style, {
       width: "28px",
       height: "28px",
-      borderRadius: "6px",
-      background: "#000",
-      color: "#fff",
+      borderRadius: "50%",
+      background: "#fff",
+      color: "#333",
+      fontSize: "14px",
       cursor: "pointer",
-      border: "none",
-      boxShadow: "0 2px 6px rgba(0,0,0,.2)",
+      border: "1px solid #ccc",
+      boxShadow: "0 2px 4px rgba(0,0,0,.15)",
+      transition: "background .2s ease, transform .15s ease",
     });
+    btn.onmouseenter = () => (btn.style.transform = "scale(1.1)");
+    btn.onmouseleave = () => (btn.style.transform = "scale(1)");
     return btn;
   };
 
   const rotBtn = mkBtn("↻", "살짝 기울이기");
   const delBtn = mkBtn("🗑️", "삭제");
-
   right.appendChild(rotBtn);
   right.appendChild(delBtn);
   footer.appendChild(right);
-  card.appendChild(footer); // 한 번만 append
 
-  return { wrap, card, textarea, delBtn, rotBtn };
+  // ✅ 올바른 append 순서
+  cardInner.appendChild(tape);
+  cardInner.appendChild(textarea);
+  cardInner.appendChild(footer);
+
+  // 첫 프레임에 강제 리페인트
+  requestAnimationFrame(() => {
+    shadow.style.boxShadow = "0 18px 30px rgba(0,0,0,.2201)";
+  });
+
+  return { wrap, card, cardInner, textarea, delBtn, rotBtn, tape };
 };
 
 export const Note3D = ({ note, onObjectReady }: Props) => {
   const { scene } = useThree();
   const { updateNote, removeNote } = useNotes();
 
-  // IME(한글) 조합 플래그 & 저장 제어
   const composingRef = useRef(false);
   const dirtyRef = useRef(false);
   const saveTimer = useRef<number | null>(null);
 
-  // 한 번만 생성
-  const { obj, card, textarea, delBtn, rotBtn } = useMemo(() => {
-    const { wrap, card, textarea, delBtn, rotBtn } = buildNoteElement(note);
-    const obj = new CSS3DObject(wrap);
-    (obj as any).userData.noteId = note.id;
-    return { obj, card, textarea, delBtn, rotBtn };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 최초 1회
+  const { obj, card, cardInner, textarea, delBtn, rotBtn, tape } =
+    useMemo(() => {
+      const { wrap, card, cardInner, textarea, delBtn, rotBtn, tape } =
+        buildNoteElement(note);
+      const obj = new CSS3DObject(wrap);
+      return { obj, card, cardInner, textarea, delBtn, rotBtn, tape };
+    }, []);
 
-  // 씬 add/remove
   useEffect(() => {
     scene.add(obj);
     onObjectReady?.(obj);
@@ -169,7 +192,7 @@ export const Note3D = ({ note, onObjectReady }: Props) => {
     };
   }, [obj, scene, onObjectReady]);
 
-  // note 변화 반영 (조합 중엔 textarea 값 강제 덮어쓰기 금지)
+  // note 반영
   useEffect(() => {
     if (!composingRef.current && textarea.value !== (note.text ?? "")) {
       textarea.value = note.text ?? "";
@@ -186,17 +209,14 @@ export const Note3D = ({ note, onObjectReady }: Props) => {
   }, [note, obj, card, textarea]);
 
   const rotationRef = useRef<number>(note.rotationZ ?? 0);
-
   useEffect(() => {
     rotationRef.current = note.rotationZ ?? 0;
   }, [note.rotationZ]);
 
-  // 입력/조합/포커스 이벤트 (조합 끝 또는 blur 때만 저장)
+  // 입력 이벤트
   useEffect(() => {
     const stopBub = (e: Event) => e.stopPropagation();
     textarea.addEventListener("pointerdown", stopBub, { capture: true });
-    textarea.addEventListener("mousedown", stopBub, { capture: true });
-    textarea.addEventListener("click", stopBub, { capture: true });
 
     const flush = () => {
       if (saveTimer.current) {
@@ -210,33 +230,30 @@ export const Note3D = ({ note, onObjectReady }: Props) => {
 
     const onCompositionStart = () => {
       composingRef.current = true;
-      obj.rotation.set(0, 0, 0);
     };
 
     const onCompositionEnd = () => {
       composingRef.current = false;
-      flush(); // 조합 종료 시 한 번 저장
-      obj.rotation.set(0, 0, rotationRef.current);
+      dirtyRef.current = false; // ✅ 조합 종료 후 dirty 초기화
+      updateNote(note.id, { text: textarea.value });
     };
 
     const onInput = (e: Event) => {
       e.stopPropagation();
-      dirtyRef.current = true; // 내용 변경만 표시, 저장은 하지 않음
+      dirtyRef.current = true;
+
+      if (!composingRef.current) {
+        updateNote(note.id, { text: textarea.value });
+        dirtyRef.current = false; // ✅ 영어 입력은 바로 저장 후 dirty 해제
+      }
     };
 
-    // const onBlur = () => {
-    //   flush();
-    //   obj.rotation.set(0, 0, rotationRef.current);
-    // };
+    textarea.addEventListener("compositionstart", onCompositionStart);
+    textarea.addEventListener("compositionend", onCompositionEnd);
+    textarea.addEventListener("input", onInput);
 
     return () => {
-      textarea.removeEventListener("pointerdown", stopBub, {
-        capture: true,
-      } as any);
-      textarea.removeEventListener("mousedown", stopBub, {
-        capture: true,
-      } as any);
-      textarea.removeEventListener("click", stopBub, { capture: true } as any);
+      textarea.removeEventListener("pointerdown", stopBub);
       textarea.removeEventListener("compositionstart", onCompositionStart);
       textarea.removeEventListener("compositionend", onCompositionEnd);
       textarea.removeEventListener("input", onInput);
@@ -244,7 +261,7 @@ export const Note3D = ({ note, onObjectReady }: Props) => {
     };
   }, [note.id, textarea, updateNote]);
 
-  // 버튼 핸들러
+  // 버튼
   useEffect(() => {
     const onDelete = (e: Event) => {
       e.stopPropagation();
@@ -252,7 +269,7 @@ export const Note3D = ({ note, onObjectReady }: Props) => {
     };
     const onRotate = (e: Event) => {
       e.stopPropagation();
-      const jitter = (Math.random() - 0.5) * 0.2; // ±0.1rad
+      const jitter = (Math.random() - 0.5) * 0.2;
       updateNote(note.id, { rotationZ: (note.rotationZ ?? 0) + jitter });
     };
 
@@ -264,27 +281,5 @@ export const Note3D = ({ note, onObjectReady }: Props) => {
     };
   }, [delBtn, rotBtn, note.id, note.rotationZ, removeNote, updateNote]);
 
-  useEffect(() => {
-    const el = (obj.element as HTMLElement) || null;
-    if (!el) return;
-
-    const onEnter = () => {
-      // 조합 중/포커스 중이면 연출 생략 (IME 안정)
-      if (composingRef.current || document.activeElement === textarea) return;
-      card.style.transition = "transform .15s ease";
-      card.style.transform = "translateZ(0) scale(1.02)";
-    };
-    const onLeave = () => {
-      card.style.transform = "";
-    };
-
-    el.addEventListener("pointerenter", onEnter);
-    el.addEventListener("pointerleave", onLeave);
-    return () => {
-      el.removeEventListener("pointerenter", onEnter);
-      el.removeEventListener("pointerleave", onLeave);
-    };
-  }, [obj, card, textarea]);
-
-  return null; // CSS3DObject로만 렌더
+  return null;
 };

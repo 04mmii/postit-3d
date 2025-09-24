@@ -46,6 +46,12 @@ export const useDrag = ({ camera, surface, onDrop }: Params) => {
       el.style.cursor = "grabbing";
       dragging = obj;
 
+      // ✅ 드래그 중 그림자 강화 (shadow 레이어만)
+      const shadow = el.querySelector(
+        '[data-role="shadow"]'
+      ) as HTMLDivElement | null;
+      if (shadow) shadow.style.boxShadow = "0 24px 38px rgba(0,0,0,.28)";
+
       // ⬇️ 드래그 중 연출
       el.classList.add("dragging");
       const card = el.querySelector(
@@ -99,6 +105,12 @@ export const useDrag = ({ camera, surface, onDrop }: Params) => {
         card.style.transform = "translateZ(0) scale(1.00)";
       }
       el.style.filter = "drop-shadow(0 18px 30px rgba(0,0,0,.22))";
+
+      // ✅ 원복
+      const shadow = el.querySelector(
+        '[data-role="shadow"]'
+      ) as HTMLDivElement | null;
+      if (shadow) shadow.style.boxShadow = "0 18px 30px rgba(0,0,0,.22)";
 
       if (!obj) return;
       obj.position.z = 0; // 원래 높이로
