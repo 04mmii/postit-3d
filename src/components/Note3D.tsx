@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer";
 import type { Note } from "../types/note";
 import { useThree } from "../contexts/ThreeContext";
 import { useNotes } from "../contexts/NotesContext";
+import * as THREE from "three";
 
 type Props = {
   note: Note;
-  onObjectReady?: (obj: CSS3DObject) => void;
+  onObjectReady?: (obj: THREE.Object3D) => void;
 };
 
 const colorOf = (c: any) =>
@@ -18,29 +19,22 @@ const colorOf = (c: any) =>
         ? "#B2EBF2"
         : "#FFF9C4";
 
-/** DOM 생성: 실제로 쓰는 것만 반환 (불필요한 반환 제거) */
+/** DOM 빌드 (한 번만) */
 const buildNoteElement = (note: Note) => {
   const wrap = document.createElement("div");
   Object.assign(wrap.style, {
     position: "relative",
     width: "220px",
     height: "220px",
-    transform: "translateZ(0)",
-    WebkitFontSmoothing: "antialiased",
     transformStyle: "preserve-3d",
     backfaceVisibility: "hidden",
-    boxShadow: `
-      0 4px 6px rgba(0,0,0,.1),
-      0 10px 15px rgba(0,0,0,.15),
-      0 18px 30px rgba(0,0,0,.2)
-    `,
   });
 
   const card = document.createElement("div");
   Object.assign(card.style, {
+    position: "relative",
     width: "100%",
     height: "100%",
-    position: "relative",
   });
 
   const cardInner = document.createElement("div");
@@ -65,7 +59,7 @@ const buildNoteElement = (note: Note) => {
     borderRadius: "10px 0 0 0",
     pointerEvents: "none",
     boxShadow: "0 18px 30px rgba(0,0,0,.22)",
-    webkitMaskImage: "linear-gradient(#0000 0 26px, #000 26px)",
+    WebkitMaskImage: "linear-gradient(#0000 0 26px, #000 26px)",
     maskImage: "linear-gradient(#0000 0 26px, #000 26px)",
     zIndex: "0",
   });
@@ -73,7 +67,6 @@ const buildNoteElement = (note: Note) => {
   wrap.appendChild(shadow);
   wrap.appendChild(card);
 
-  // 테이프
   const tape = document.createElement("div");
   Object.assign(tape.style, {
     alignSelf: "center",
@@ -88,7 +81,6 @@ const buildNoteElement = (note: Note) => {
     transform: `rotate(${((Math.random() - 0.5) * 4).toFixed(2)}deg)`,
   });
 
-  // 텍스트
   const textarea = document.createElement("textarea");
   textarea.value = note.text ?? "";
   textarea.placeholder = "할 일을 적어보세요…";
@@ -104,7 +96,6 @@ const buildNoteElement = (note: Note) => {
     userSelect: "text",
   });
 
-  // 푸터
   const footer = document.createElement("div");
   Object.assign(footer.style, {
     display: "flex",
@@ -139,34 +130,31 @@ const buildNoteElement = (note: Note) => {
     });
     return btn;
   };
-
   const rotBtn = mkBtn("↻", "살짝 기울이기");
   const delBtn = mkBtn("🗑️", "삭제");
   right.appendChild(rotBtn);
   right.appendChild(delBtn);
   footer.appendChild(right);
 
-  // 올바른 순서로 부착
   cardInner.appendChild(tape);
   cardInner.appendChild(textarea);
   cardInner.appendChild(footer);
 
-  // 초기 그림자 보장
+  // 초기 그림자 보장 트릭
   requestAnimationFrame(() => {
     shadow.style.boxShadow = "0 18px 30px rgba(0,0,0,.2201)";
   });
 
-  // ✅ 실제로 쓰는 것만 반환 (card, tape 등 불필요한 반환 제거)
   return { wrap, cardInner, textarea, delBtn, rotBtn };
 };
 
-export const Note3D = ({ note, onObjectReady }: Props) => {
+const Note3DBase = ({ note, onObjectReady }: Props) => {
   const { scene, renderer } = useThree();
-  const { updateNote, removeNote } = useNotes();
+  const { updateNote, deleteNote } = useNotes();
 
   const composingRef = useRef(false);
+  const editingRef = useRef(false);
 
-  // ✅ 반환이 바뀌었으니 구조분해도 맞춰서 (TS 경고 제거)
   const { obj, cardInner, textarea, delBtn, rotBtn } = useMemo(() => {
     const { wrap, cardInner, textarea, delBtn, rotBtn } =
       buildNoteElement(note);
@@ -174,103 +162,171 @@ export const Note3D = ({ note, onObjectReady }: Props) => {
     (obj as any).userData.noteId = note.id;
     return { obj, cardInner, textarea, delBtn, rotBtn };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // DOM은 1회만 생성
+  }, []); // DOM은 1회만
 
-  // 씬 add/remove
-  useEffect(() => {
-    scene.add(obj);
-    onObjectReady?.(obj);
-    return () => {
-      scene.remove(obj);
-    };
-  }, [obj, scene, onObjectReady]);
+  const { group, picker } = useMemo(() => {
+    const geo = new THREE.PlaneGeometry(220, 220);
+    const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+    const picker = new THREE.Mesh(geo, mat);
+    const group = new THREE.Group();
+    group.add(picker);
+    return { group, picker };
+  }, []);
 
-  // note 변화 반영 (조합 중엔 값 덮어쓰지 않음)
   useEffect(() => {
-    if (!composingRef.current && textarea.value !== (note.text ?? "")) {
-      textarea.value = note.text ?? "";
-    }
-    cardInner.style.background = colorOf(note.color); // ✅ card → cardInner
-    obj.position.set(
+    // picker에도 noteId를 심어 둔다 (dragend에서 바로 가져다 쓰게)
+    (picker as any).userData.noteId = note.id;
+
+    group.add(obj); // CSS3DObject를 그룹에 붙이고
+    group.position.set(
       note.position?.x ?? 0,
       note.position?.y ?? 0,
       note.position?.z ?? 0
     );
-    obj.rotation.set(0, 0, note.rotationZ ?? 0);
-  }, [note, obj, cardInner, textarea]);
+    group.rotation.set(0, 0, note.rotationZ ?? 0);
 
-  // 입력 이벤트 (IME 완전 대응 + DragControls 충돌 차단)
+    scene.add(group);
+    onObjectReady?.(picker); // ⬅️ DragControls는 picker를 잡게
+
+    return () => {
+      scene.remove(group);
+    };
+  }, [
+    group,
+    picker,
+    obj,
+    scene,
+    onObjectReady,
+    note.id,
+    note.position,
+    note.rotationZ,
+  ]);
+
+  // add/remove
   useEffect(() => {
-    const stopBub = (e: Event) => e.stopPropagation();
-    textarea.addEventListener("pointerdown", stopBub, { capture: true } as any);
-    textarea.addEventListener(
-      "pointermove",
-      stopBub as any,
-      { capture: true } as any
-    ); // 드래그 충돌 방지
-    textarea.addEventListener("mousedown", stopBub, { capture: true } as any);
-    textarea.addEventListener("click", stopBub, { capture: true } as any);
+    scene.add(obj);
+    onObjectReady?.(obj);
+    return () => void scene.remove(obj);
+  }, [obj, scene, onObjectReady]);
 
-    const onCompositionStart = () => {
-      composingRef.current = true;
-    };
-    const onCompositionEnd = () => {
-      composingRef.current = false;
-      updateNote(note.id, { text: textarea.value }); // 조합 끝 저장
-    };
-    const onInput = (e: Event) => {
-      e.stopPropagation();
-      if (!composingRef.current) {
-        updateNote(note.id, { text: textarea.value }); // 일반 입력 즉시 저장
-      }
-    };
+  // note → view 반영 (편집 중이면 text 덮어쓰기 금지)
+  useEffect(() => {
+    if (!composingRef.current && textarea.value !== (note.text ?? "")) {
+      textarea.value = note.text ?? "";
+    }
+    cardInner.style.background = colorOf(note.color);
+    group.position.set(
+      note.position?.x ?? 0,
+      note.position?.y ?? 0,
+      note.position?.z ?? 0
+    );
+    group.rotation.set(0, 0, note.rotationZ ?? 0);
+  }, [note, group, cardInner, textarea]);
+
+  // 입력/조합/포커스 (저장은 blur & compositionend 에서만)
+  useEffect(() => {
+    const el = textarea;
+
+    const stop = (e: Event) => e.stopPropagation(); // DragControls로 버블 방지
+    el.addEventListener("pointerdown", stop, { capture: true });
+    el.addEventListener("pointermove", stop, { capture: true });
+    el.addEventListener("mousedown", stop, { capture: true });
+    el.addEventListener("click", stop, { capture: true });
+    el.addEventListener("keydown", stop, { capture: true });
 
     const onFocus = () => {
-      // 렌더러가 포인터를 가로채지 않도록
+      editingRef.current = true;
       (renderer.domElement as HTMLElement).style.pointerEvents = "none";
     };
     const onBlur = () => {
+      editingRef.current = false;
       (renderer.domElement as HTMLElement).style.pointerEvents = "auto";
+      if (!composingRef.current) {
+        updateNote(note.id, { text: el.value });
+      }
+    };
+    const onCompStart = () => {
+      composingRef.current = true;
+    };
+    const onCompEnd = () => {
+      composingRef.current = false;
+      updateNote(note.id, { text: el.value });
+    };
+    const onInput = (e: Event) => {
+      // 화면에만 반영 (이미 textarea.value로 보임). 저장은 blur/compEnd에서.
+      e.stopPropagation();
     };
 
-    textarea.addEventListener("focus", onFocus);
-    textarea.addEventListener("blur", onBlur);
-
-    textarea.addEventListener("compositionstart", onCompositionStart);
-    textarea.addEventListener("compositionend", onCompositionEnd);
-    textarea.addEventListener("input", onInput);
+    el.addEventListener("focus", onFocus);
+    el.addEventListener("blur", onBlur);
+    el.addEventListener("compositionstart", onCompStart);
+    el.addEventListener("compositionend", onCompEnd);
+    el.addEventListener("input", onInput);
 
     return () => {
-      textarea.removeEventListener("pointerdown", stopBub as any);
-      textarea.removeEventListener("pointermove", stopBub as any);
-      textarea.removeEventListener("mousedown", stopBub as any);
-      textarea.removeEventListener("click", stopBub as any);
-      textarea.removeEventListener("keydown", stopBub as any);
-      textarea.removeEventListener("compositionstart", onCompositionStart);
-      textarea.removeEventListener("compositionend", onCompositionEnd);
-      textarea.removeEventListener("input", onInput);
+      el.removeEventListener(
+        "pointerdown",
+        stop as any,
+        { capture: true } as any
+      );
+      el.removeEventListener(
+        "pointermove",
+        stop as any,
+        { capture: true } as any
+      );
+      el.removeEventListener(
+        "mousedown",
+        stop as any,
+        { capture: true } as any
+      );
+      el.removeEventListener("click", stop as any, { capture: true } as any);
+      el.removeEventListener("keydown", stop as any, { capture: true } as any);
+
+      el.removeEventListener("focus", onFocus);
+      el.removeEventListener("blur", onBlur);
+      el.removeEventListener("compositionstart", onCompStart);
+      el.removeEventListener("compositionend", onCompEnd);
+      el.removeEventListener("input", onInput);
+
+      (renderer.domElement as HTMLElement).style.pointerEvents = "auto";
     };
-  }, [note.id, textarea, updateNote]);
+  }, [note.id, textarea, updateNote, renderer.domElement]);
 
   // 버튼
   useEffect(() => {
     const onDelete = (e: Event) => {
       e.stopPropagation();
-      removeNote(note.id);
+      deleteNote(note.id);
     };
     const onRotate = (e: Event) => {
       e.stopPropagation();
-      const jitter = (Math.random() - 0.5) * 0.2; // ±0.1rad
+      const jitter = (Math.random() - 0.5) * 0.2;
       updateNote(note.id, { rotationZ: (note.rotationZ ?? 0) + jitter });
     };
-
     delBtn.addEventListener("click", onDelete);
     rotBtn.addEventListener("click", onRotate);
     return () => {
       delBtn.removeEventListener("click", onDelete);
       rotBtn.removeEventListener("click", onRotate);
     };
-  }, [delBtn, rotBtn, note.id, note.rotationZ, removeNote, updateNote]);
+  }, [delBtn, rotBtn, note.id, note.rotationZ, deleteNote, updateNote]);
 
   return null;
 };
+
+// ✱ 텍스트 변화로는 리렌더 안 되게 (편집 중 커서/조합 보존)
+const areEqual = (prev: Props, next: Props) => {
+  const a = prev.note,
+    b = next.note;
+  return (
+    a.id === b.id &&
+    a.color === b.color &&
+    a.rotationZ === b.rotationZ &&
+    a.position?.x === b.position?.x &&
+    a.position?.y === b.position?.y &&
+    a.position?.z === b.position?.z
+    // a.text 비교 의도적으로 제외!
+  );
+};
+
+export const Note3D = memo(Note3DBase, areEqual);

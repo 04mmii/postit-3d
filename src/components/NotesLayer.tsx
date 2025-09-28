@@ -1,23 +1,22 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useThree } from "../contexts/ThreeContext";
 import { useNotes } from "../contexts/NotesContext";
 import { Note3D } from "./Note3D";
 import { DragControls } from "three/examples/jsm/controls/DragControls";
-import type { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer";
+import * as THREE from "three";
 
-export function NotesLayer() {
+export const NotesLayer: React.FC = () => {
   const { notes, updateNote } = useNotes();
   const { camera, renderer } = useThree();
 
-  const objectsRef = useRef<CSS3DObject[]>([]);
+  const objectsRef = useRef<THREE.Object3D[]>([]);
   const controlsRef = useRef<DragControls | null>(null);
 
-  // ✅ 노트 "ID만" 키로 사용 → 텍스트 변경에는 반응하지 않음
-  const idsKey = useMemo(() => notes.map((n) => n.id).join(","), [notes]);
-
-  // ✅ DragControls는 추가/삭제(ID 변화)에만 재생성
-  useEffect(() => {
+  // DragControls 재생성
+  const rebuildControls = () => {
     controlsRef.current?.dispose();
+    controlsRef.current = null;
+
     if (objectsRef.current.length === 0) return;
 
     const controls = new DragControls(
@@ -28,25 +27,31 @@ export function NotesLayer() {
 
     controls.addEventListener("dragstart", (ev: any) => {
       document.body.style.userSelect = "none";
-      ev.object.position.z = 20;
+      ev.object.position.z = (ev.object.position.z ?? 0) + 1;
     });
 
     controls.addEventListener("dragend", (ev: any) => {
       document.body.style.userSelect = "";
-      const id = ev.object.userData.noteId as string;
+      // Note3D에서 picker.userData.noteId 를 심어줄 거라 바로 사용 가능
+      const id = ev.object.userData.noteId as string | undefined;
+      if (!id) return;
       const p = ev.object.position;
-      const rotZ = ev.object.rotation.z;
-      updateNote(id, {
-        position: { x: p.x, y: p.y, z: p.z },
-        rotationZ: rotZ,
-      });
+      const rz = ev.object.rotation.z;
+      updateNote(id, { position: { x: p.x, y: p.y, z: p.z }, rotationZ: rz });
     });
 
     controlsRef.current = controls;
-    return () => controls.dispose();
-  }, [idsKey, camera, renderer, updateNote]);
+  };
 
-  // ✅ textarea에 포커스 들어오면 드래그 완전 비활성화, 포커스 빠지면 활성화
+  // 노트 목록 바뀌면 수집 초기화
+  useEffect(() => {
+    objectsRef.current = [];
+    controlsRef.current?.dispose();
+    controlsRef.current = null;
+    // Note3D들이 onObjectReady로 객체들을 다시 밀어넣으면서 rebuildControls가 호출됨
+  }, [notes]);
+
+  // textarea 포커스 중에는 DragControls 비활성화
   useEffect(() => {
     const onFocusIn = (e: Event) => {
       if (e.target instanceof HTMLTextAreaElement) {
@@ -66,14 +71,11 @@ export function NotesLayer() {
     };
   }, []);
 
-  // Note3D가 전달하는 CSS3DObject 모으기
-  useEffect(() => {
-    objectsRef.current = []; // ID 변경 시에만 초기화
-  }, [idsKey]);
-
-  const handleReady = (obj: CSS3DObject) => {
+  // Note3D가 넘겨주는 '픽커 Object3D' 수집
+  const handleReady = (obj: THREE.Object3D) => {
     if (!objectsRef.current.includes(obj)) {
       objectsRef.current.push(obj);
+      rebuildControls();
     }
   };
 
@@ -84,4 +86,4 @@ export function NotesLayer() {
       ))}
     </>
   );
-}
+};
