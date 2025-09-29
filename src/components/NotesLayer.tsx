@@ -1,81 +1,66 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import * as THREE from "three";
+import { DragControls } from "three/examples/jsm/controls/DragControls";
 import { useThree } from "../contexts/ThreeContext";
 import { useNotes } from "../contexts/NotesContext";
 import { Note3D } from "./Note3D";
-import { DragControls } from "three/examples/jsm/controls/DragControls";
-import * as THREE from "three";
 
-export const NotesLayer: React.FC = () => {
+export function NotesLayer() {
   const { notes, updateNote } = useNotes();
   const { camera, renderer } = useThree();
 
-  const objectsRef = useRef<THREE.Object3D[]>([]);
+  const pickersRef = useRef<THREE.Object3D[]>([]);
   const controlsRef = useRef<DragControls | null>(null);
 
-  // DragControls 재생성
+  // 노트 ID만 묶어서 DragControls 재생성 트리거
+  const idsKey = useMemo(() => notes.map((n) => n.id).join(","), [notes]);
+
   const rebuildControls = () => {
     controlsRef.current?.dispose();
     controlsRef.current = null;
 
-    if (objectsRef.current.length === 0) return;
+    if (pickersRef.current.length === 0) return;
 
-    // ✅ 화면 위에 실제로 이벤트를 받는 엘리먼트로!
-    const domForDrag =
-      (document.querySelector(".css3d-container") as HTMLElement) || // ← CSS3D root (프로젝트에 맞게 셀렉터)
-      renderer.domElement; // fallback
-    const controls = new DragControls(objectsRef.current, camera, domForDrag);
+    const controls = new DragControls(
+      pickersRef.current,
+      camera,
+      renderer.domElement
+    );
 
-    controls.addEventListener("dragstart", (ev: any) => {
-      document.body.style.userSelect = "none";
-      ev.object.position.z = (ev.object.position.z ?? 0) + 1;
+    controls.addEventListener("drag", (ev: any) => {
+      const picker = ev.object as THREE.Object3D;
+      const group = picker.parent as THREE.Group;
+      if (group) group.position.copy(picker.position);
     });
 
     controls.addEventListener("dragend", (ev: any) => {
-      document.body.style.userSelect = "";
-      // Note3D에서 picker.userData.noteId 를 심어줄 거라 바로 사용 가능
-      const id = ev.object.userData.noteId as string | undefined;
+      const picker = ev.object as THREE.Object3D;
+      const group = picker.parent as THREE.Group;
+      if (!group) return;
+      group.position.copy(picker.position);
+      const id = (picker as any).userData.noteId as string | undefined;
       if (!id) return;
-      const p = ev.object.position;
-      const rz = ev.object.rotation.z;
+      const p = group.position;
+      const rz = group.rotation.z;
       updateNote(id, { position: { x: p.x, y: p.y, z: p.z }, rotationZ: rz });
     });
 
     controlsRef.current = controls;
   };
 
-  // 노트 목록 바뀌면 수집 초기화
+  // 노트 배열이 바뀌면 다시 수집
   useEffect(() => {
-    objectsRef.current = [];
+    pickersRef.current = [];
     controlsRef.current?.dispose();
     controlsRef.current = null;
-    // Note3D들이 onObjectReady로 객체들을 다시 밀어넣으면서 rebuildControls가 호출됨
-  }, [notes]);
+    // 실제 컨트롤 생성은 picker가 채워진 뒤 (handleReady에서) 수행
+  }, [idsKey]);
 
-  // textarea 포커스 중에는 DragControls 비활성화
-  useEffect(() => {
-    const onFocusIn = (e: Event) => {
-      if (e.target instanceof HTMLTextAreaElement) {
-        if (controlsRef.current) (controlsRef.current as any).enabled = false;
-      }
-    };
-    const onFocusOut = (e: Event) => {
-      if (e.target instanceof HTMLTextAreaElement) {
-        if (controlsRef.current) (controlsRef.current as any).enabled = true;
-      }
-    };
-    document.addEventListener("focusin", onFocusIn);
-    document.addEventListener("focusout", onFocusOut);
-    return () => {
-      document.removeEventListener("focusin", onFocusIn);
-      document.removeEventListener("focusout", onFocusOut);
-    };
-  }, []);
-
-  // Note3D가 넘겨주는 '픽커 Object3D' 수집
-  const handleReady = (obj: THREE.Object3D) => {
-    if (!objectsRef.current.includes(obj)) {
-      objectsRef.current.push(obj);
-      rebuildControls();
+  // Note3D에서 picker 받아서 수집
+  const handleReady = (picker: THREE.Object3D) => {
+    if (!pickersRef.current.includes(picker)) {
+      pickersRef.current.push(picker);
+      rebuildControls(); // 하나 들어올 때마다 안전하게 재생성
     }
   };
 
@@ -86,4 +71,4 @@ export const NotesLayer: React.FC = () => {
       ))}
     </>
   );
-};
+}

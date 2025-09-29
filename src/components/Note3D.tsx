@@ -1,13 +1,13 @@
 import { memo, useEffect, useMemo, useRef } from "react";
+import * as THREE from "three";
 import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer";
 import type { Note } from "../types/note";
 import { useThree } from "../contexts/ThreeContext";
 import { useNotes } from "../contexts/NotesContext";
-import * as THREE from "three";
 
 type Props = {
   note: Note;
-  onObjectReady?: (obj: THREE.Object3D) => void;
+  onObjectReady?: (obj: THREE.Object3D) => void; // DragControls가 받을 객체
 };
 
 const colorOf = (c: any) =>
@@ -19,7 +19,7 @@ const colorOf = (c: any) =>
         ? "#B2EBF2"
         : "#FFF9C4";
 
-/** DOM 빌드 (한 번만) */
+/** DOM 생성 (한 번만) */
 const buildNoteElement = (note: Note) => {
   const wrap = document.createElement("div");
   Object.assign(wrap.style, {
@@ -28,6 +28,8 @@ const buildNoteElement = (note: Note) => {
     height: "220px",
     transformStyle: "preserve-3d",
     backfaceVisibility: "hidden",
+    // 캔버스 드래그 이벤트가 뒤에서 동작하도록 기본은 none
+    pointerEvents: "none",
   });
 
   const card = document.createElement("div");
@@ -48,10 +50,11 @@ const buildNoteElement = (note: Note) => {
     display: "flex",
     flexDirection: "column",
     gap: "8px",
+    // 내부 전체는 기본 none, 필요한 요소만 auto로 켠다
+    pointerEvents: "none",
   });
   card.appendChild(cardInner);
 
-  // 상단 잘린 그림자
   const shadow = document.createElement("div");
   Object.assign(shadow.style, {
     position: "absolute",
@@ -59,7 +62,7 @@ const buildNoteElement = (note: Note) => {
     borderRadius: "10px 0 0 0",
     pointerEvents: "none",
     boxShadow: "0 18px 30px rgba(0,0,0,.22)",
-    WebkitMaskImage: "linear-gradient(#0000 0 26px, #000 26px)",
+    webkitMaskImage: "linear-gradient(#0000 0 26px, #000 26px)", // 소문자 w
     maskImage: "linear-gradient(#0000 0 26px, #000 26px)",
     zIndex: "0",
   });
@@ -94,7 +97,7 @@ const buildNoteElement = (note: Note) => {
     lineHeight: "1.4",
     fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
     userSelect: "text",
-    pointerEvents: "auto",
+    pointerEvents: "auto", // 여기만 켠다
   });
 
   const footer = document.createElement("div");
@@ -108,11 +111,18 @@ const buildNoteElement = (note: Note) => {
   date.textContent = new Date(
     note.createdAt ?? Date.now()
   ).toLocaleDateString();
-  Object.assign(date.style, { fontSize: "12px", opacity: ".7" });
-  footer.appendChild(date);
+  Object.assign(date.style, {
+    fontSize: "12px",
+    opacity: ".7",
+    pointerEvents: "none",
+  });
 
   const right = document.createElement("div");
-  Object.assign(right.style, { display: "flex", gap: "6px" });
+  Object.assign(right.style, {
+    display: "flex",
+    gap: "6px",
+    pointerEvents: "none",
+  });
 
   const mkBtn = (label: string, title: string) => {
     const btn = document.createElement("button");
@@ -128,26 +138,33 @@ const buildNoteElement = (note: Note) => {
       color: "#333",
       border: "1px solid #ccc",
       cursor: "pointer",
-      pointerEvents: "auto",
+      pointerEvents: "auto", // 버튼은 켠다
     });
-
-    // ✅ 드래그 훔치지 못하게 캡처 단계에서 DragControls로 버블 차단
+    // 드래그 캔버스로 안 올라가게 캡처에서 차단
     const stop = (e: Event) => e.stopPropagation();
     btn.addEventListener("pointerdown", stop, { capture: true });
+    btn.addEventListener("click", stop, { capture: true });
     return btn;
   };
 
   const rotBtn = mkBtn("↻", "살짝 기울이기");
   const delBtn = mkBtn("🗑️", "삭제");
-  right.appendChild(rotBtn);
-  right.appendChild(delBtn);
-  footer.appendChild(right);
+
+  footer.appendChild(date);
+  const btnWrap = document.createElement("div");
+  Object.assign(btnWrap.style, {
+    display: "flex",
+    gap: "6px",
+    pointerEvents: "none",
+  });
+  btnWrap.appendChild(rotBtn);
+  btnWrap.appendChild(delBtn);
+  footer.appendChild(btnWrap);
 
   cardInner.appendChild(tape);
   cardInner.appendChild(textarea);
   cardInner.appendChild(footer);
 
-  // 초기 그림자 보장 트릭
   requestAnimationFrame(() => {
     shadow.style.boxShadow = "0 18px 30px rgba(0,0,0,.2201)";
   });
@@ -156,12 +173,12 @@ const buildNoteElement = (note: Note) => {
 };
 
 const Note3DBase = ({ note, onObjectReady }: Props) => {
-  const { scene, renderer } = useThree();
+  const { scene } = useThree();
   const { updateNote, deleteNote } = useNotes();
 
   const composingRef = useRef(false);
-  const editingRef = useRef(false);
 
+  // DOM + CSS3D (한 번만)
   const { obj, cardInner, textarea, delBtn, rotBtn } = useMemo(() => {
     const { wrap, cardInner, textarea, delBtn, rotBtn } =
       buildNoteElement(note);
@@ -169,8 +186,9 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
     (obj as any).userData.noteId = note.id;
     return { obj, cardInner, textarea, delBtn, rotBtn };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // DOM은 1회만
+  }, []);
 
+  // WebGL group + picker (드래그 전용)
   const { group, picker } = useMemo(() => {
     const geo = new THREE.PlaneGeometry(220, 220);
     const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
@@ -180,19 +198,18 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
     return { group, picker };
   }, []);
 
+  // group에 CSS3D obj 부착 + 씬 등록
   useEffect(() => {
-    // picker에도 noteId를 심어 둔다 (dragend에서 바로 가져다 쓰게)
     (picker as any).userData.noteId = note.id;
-
-    group.add(obj); // CSS3DObject를 그룹에 붙이고
+    group.add(obj);
     group.position.set(
       note.position?.x ?? 0,
       note.position?.y ?? 0,
       note.position?.z ?? 0
     );
     group.rotation.set(0, 0, note.rotationZ ?? 0);
-
     scene.add(group);
+    // DragControls 쪽으로 picker를 넘긴다
     onObjectReady?.(picker);
 
     return () => {
@@ -209,7 +226,7 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
     note.rotationZ,
   ]);
 
-  // note → view 반영 (편집 중이면 text 덮어쓰기 금지)
+  // note → view (편집 중엔 text 덮어쓰기 X)
   useEffect(() => {
     if (!composingRef.current && textarea.value !== (note.text ?? "")) {
       textarea.value = note.text ?? "";
@@ -223,21 +240,15 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
     group.rotation.set(0, 0, note.rotationZ ?? 0);
   }, [note, group, cardInner, textarea]);
 
-  // 입력/조합/포커스 (저장은 blur & compositionend 에서만)
+  // 입력/조합 (저장은 blur & compositionend)
   useEffect(() => {
     const el = textarea;
 
-    const stop = (e: Event) => e.stopPropagation(); // DragControls로 버블 방지
+    const stop = (e: Event) => e.stopPropagation();
     el.addEventListener("pointerdown", stop, { capture: true });
 
-    const onFocus = () => {
-      editingRef.current = true;
-    };
     const onBlur = () => {
-      editingRef.current = false;
-      if (!composingRef.current) {
-        updateNote(note.id, { text: el.value });
-      }
+      if (!composingRef.current) updateNote(note.id, { text: el.value });
     };
     const onCompStart = () => {
       composingRef.current = true;
@@ -247,11 +258,10 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
       updateNote(note.id, { text: el.value });
     };
     const onInput = (e: Event) => {
-      // 화면에만 반영 (이미 textarea.value로 보임). 저장은 blur/compEnd에서.
+      // 화면에만 반영, 저장은 blur/compEnd
       e.stopPropagation();
     };
 
-    el.addEventListener("focus", onFocus);
     el.addEventListener("blur", onBlur);
     el.addEventListener("compositionstart", onCompStart);
     el.addEventListener("compositionend", onCompEnd);
@@ -263,14 +273,12 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
         stop as any,
         { capture: true } as any
       );
-
-      el.removeEventListener("focus", onFocus);
       el.removeEventListener("blur", onBlur);
       el.removeEventListener("compositionstart", onCompStart);
       el.removeEventListener("compositionend", onCompEnd);
       el.removeEventListener("input", onInput);
     };
-  }, [note.id, textarea, updateNote, renderer.domElement]);
+  }, [note.id, textarea, updateNote]);
 
   // 버튼
   useEffect(() => {
@@ -295,7 +303,7 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
   return null;
 };
 
-// ✱ 텍스트 변화로는 리렌더 안 되게 (편집 중 커서/조합 보존)
+// 텍스트 변경으로는 리렌더 막아서 IME/커서 보존
 const areEqual = (prev: Props, next: Props) => {
   const a = prev.note,
     b = next.note;
@@ -306,8 +314,7 @@ const areEqual = (prev: Props, next: Props) => {
     a.position?.x === b.position?.x &&
     a.position?.y === b.position?.y &&
     a.position?.z === b.position?.z
-    // a.text 비교 의도적으로 제외!
+    // text는 의도적으로 비교 제외
   );
 };
-
 export const Note3D = memo(Note3DBase, areEqual);
