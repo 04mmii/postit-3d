@@ -94,6 +94,7 @@ const buildNoteElement = (note: Note) => {
     lineHeight: "1.4",
     fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto",
     userSelect: "text",
+    pointerEvents: "auto",
   });
 
   const footer = document.createElement("div");
@@ -127,9 +128,15 @@ const buildNoteElement = (note: Note) => {
       color: "#333",
       border: "1px solid #ccc",
       cursor: "pointer",
+      pointerEvents: "auto",
     });
+
+    // ✅ 드래그 훔치지 못하게 캡처 단계에서 DragControls로 버블 차단
+    const stop = (e: Event) => e.stopPropagation();
+    btn.addEventListener("pointerdown", stop, { capture: true });
     return btn;
   };
+
   const rotBtn = mkBtn("↻", "살짝 기울이기");
   const delBtn = mkBtn("🗑️", "삭제");
   right.appendChild(rotBtn);
@@ -186,7 +193,7 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
     group.rotation.set(0, 0, note.rotationZ ?? 0);
 
     scene.add(group);
-    onObjectReady?.(picker); // ⬅️ DragControls는 picker를 잡게
+    onObjectReady?.(picker);
 
     return () => {
       scene.remove(group);
@@ -201,13 +208,6 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
     note.position,
     note.rotationZ,
   ]);
-
-  // add/remove
-  useEffect(() => {
-    scene.add(obj);
-    onObjectReady?.(obj);
-    return () => void scene.remove(obj);
-  }, [obj, scene, onObjectReady]);
 
   // note → view 반영 (편집 중이면 text 덮어쓰기 금지)
   useEffect(() => {
@@ -229,18 +229,12 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
 
     const stop = (e: Event) => e.stopPropagation(); // DragControls로 버블 방지
     el.addEventListener("pointerdown", stop, { capture: true });
-    el.addEventListener("pointermove", stop, { capture: true });
-    el.addEventListener("mousedown", stop, { capture: true });
-    el.addEventListener("click", stop, { capture: true });
-    el.addEventListener("keydown", stop, { capture: true });
 
     const onFocus = () => {
       editingRef.current = true;
-      (renderer.domElement as HTMLElement).style.pointerEvents = "none";
     };
     const onBlur = () => {
       editingRef.current = false;
-      (renderer.domElement as HTMLElement).style.pointerEvents = "auto";
       if (!composingRef.current) {
         updateNote(note.id, { text: el.value });
       }
@@ -269,26 +263,12 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
         stop as any,
         { capture: true } as any
       );
-      el.removeEventListener(
-        "pointermove",
-        stop as any,
-        { capture: true } as any
-      );
-      el.removeEventListener(
-        "mousedown",
-        stop as any,
-        { capture: true } as any
-      );
-      el.removeEventListener("click", stop as any, { capture: true } as any);
-      el.removeEventListener("keydown", stop as any, { capture: true } as any);
 
       el.removeEventListener("focus", onFocus);
       el.removeEventListener("blur", onBlur);
       el.removeEventListener("compositionstart", onCompStart);
       el.removeEventListener("compositionend", onCompEnd);
       el.removeEventListener("input", onInput);
-
-      (renderer.domElement as HTMLElement).style.pointerEvents = "auto";
     };
   }, [note.id, textarea, updateNote, renderer.domElement]);
 
@@ -303,6 +283,7 @@ const Note3DBase = ({ note, onObjectReady }: Props) => {
       const jitter = (Math.random() - 0.5) * 0.2;
       updateNote(note.id, { rotationZ: (note.rotationZ ?? 0) + jitter });
     };
+
     delBtn.addEventListener("click", onDelete);
     rotBtn.addEventListener("click", onRotate);
     return () => {

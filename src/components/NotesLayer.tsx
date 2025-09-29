@@ -19,11 +19,11 @@ export const NotesLayer: React.FC = () => {
 
     if (objectsRef.current.length === 0) return;
 
-    const controls = new DragControls(
-      objectsRef.current,
-      camera,
-      renderer.domElement
-    );
+    // ✅ 화면 위에 실제로 이벤트를 받는 엘리먼트로!
+    const domForDrag =
+      (document.querySelector(".css3d-container") as HTMLElement) || // ← CSS3D root (프로젝트에 맞게 셀렉터)
+      renderer.domElement; // fallback
+    const controls = new DragControls(objectsRef.current, camera, domForDrag);
 
     controls.addEventListener("dragstart", (ev: any) => {
       document.body.style.userSelect = "none";
