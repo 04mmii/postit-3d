@@ -1,3 +1,4 @@
+// src/components/Note3D.tsx
 import { memo, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer";
@@ -16,7 +17,7 @@ const colorOf = (c: any) =>
         ? "#B2EBF2"
         : "#FFF9C4";
 
-/** DOM 한 번만 생성 */
+/** DOM만 한 번 생성 */
 function buildNoteElement(note: Note) {
   const wrap = document.createElement("div");
   Object.assign(wrap.style, {
@@ -111,12 +112,12 @@ function buildNoteElement(note: Note) {
   const buttons = document.createElement("div");
   Object.assign(buttons.style, { display: "flex", gap: "6px" });
 
-  const mkBtn = (label: string, title: string) => {
+  const mkBtn = (label: string, title: string, action: "rotate" | "delete") => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = label;
     btn.title = title;
-    btn.dataset.nodrag = "1";
+    btn.dataset.action = action; // ← 이벤트 위임용
     Object.assign(btn.style, {
       width: "28px",
       height: "28px",
@@ -127,14 +128,14 @@ function buildNoteElement(note: Note) {
       cursor: "pointer",
       pointerEvents: "auto",
     });
-    // ⬅️ 드래그 시작만 캡쳐 단계에서 차단 (click은 막지 말 것!)
+    // 드래그로 안 끌려가게 pointerdown만 캡처에서 차단
     const stop = (e: Event) => e.stopPropagation();
     btn.addEventListener("pointerdown", stop, { capture: true });
     return btn;
   };
 
-  const rotBtn = mkBtn("↻", "살짝 기울이기");
-  const delBtn = mkBtn("🗑️", "삭제");
+  const rotBtn = mkBtn("↻", "살짝 기울이기", "rotate");
+  const delBtn = mkBtn("🗑️", "삭제", "delete");
   buttons.appendChild(rotBtn);
   buttons.appendChild(delBtn);
 
@@ -149,30 +150,27 @@ function buildNoteElement(note: Note) {
     shadow.style.boxShadow = "0 18px 30px rgba(0,0,0,.2201)";
   });
 
-  return { wrap, cardInner, textarea, delBtn, rotBtn };
+  return { wrap, cardInner, textarea };
 }
 
 const Note3DBase = ({ note }: Props) => {
   const { scene, camera, mountEl } = useThree();
-  const { updateNote, deleteNote, removeNote } = useNotes() as any;
-
-  // 둘 중 뭐가 오든 쓰게 통일
-  const doRemove = (removeNote ?? deleteNote) as (id: string) => void;
+  const { updateNote, removeNote } = useNotes();
 
   const composingRef = useRef(false);
 
-  // CSS DOM
-  const { obj, cardInner, textarea, delBtn, rotBtn } = useMemo(() => {
+  // DOM/CSS3DObject 1회 생성
+  const { obj, cardInner, textarea } = useMemo(() => {
     const dom = buildNoteElement(note);
     const obj = new CSS3DObject(dom.wrap);
     return { obj, ...dom };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 그룹(이 그룹을 움직인다)
+  // 이동용 3D 그룹
   const group = useMemo(() => new THREE.Group(), []);
 
-  // 장면 등록
+  // 장면 등록/해제
   useEffect(() => {
     group.add(obj);
     group.position.set(
@@ -182,11 +180,14 @@ const Note3DBase = ({ note }: Props) => {
     );
     group.rotation.set(0, 0, note.rotationZ ?? 0);
     (group as any).userData.noteId = note.id;
+
     scene.add(group);
-    return () => void scene.remove(group);
+    return () => {
+      scene.remove(group);
+    };
   }, [group, obj, scene, note.id, note.position, note.rotationZ]);
 
-  // note -> view 동기화 (IME 중엔 text 덮어쓰기 금지)
+  // note → view 반영 (IME 중엔 텍스트 덮어쓰기 금지)
   useEffect(() => {
     if (!composingRef.current && textarea.value !== (note.text ?? "")) {
       textarea.value = note.text ?? "";
@@ -200,7 +201,7 @@ const Note3DBase = ({ note }: Props) => {
     group.rotation.set(0, 0, note.rotationZ ?? 0);
   }, [note, group, cardInner, textarea]);
 
-  // 입력(IME 완전)
+  // 입력(IME 완전 대응)
   useEffect(() => {
     const onCompStart = () => (composingRef.current = true);
     const onCompEnd = () => {
@@ -223,29 +224,38 @@ const Note3DBase = ({ note }: Props) => {
     };
   }, [note.id, textarea, updateNote]);
 
-  // 버튼 (삭제/회전) — 의존성 정확히!
+  // 버튼: 이벤트 위임 (삭제/회전 둘 다 여기서 처리)
   useEffect(() => {
-    const onDelete = (e: Event) => {
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const btn = target.closest(
+        "button[data-action]"
+      ) as HTMLButtonElement | null;
+      if (!btn) return;
+
       e.stopPropagation();
-      doRemove(note.id);
+      const action = btn.dataset.action;
+
+      if (action === "delete") {
+        removeNote(note.id); // ✅ 확실히 호출
+        return;
+      }
+      if (action === "rotate") {
+        const jitter = (Math.random() - 0.5) * 0.2;
+        updateNote(note.id, { rotationZ: (note.rotationZ ?? 0) + jitter });
+        return;
+      }
     };
 
-    const onRotate = (e: Event) => {
-      e.stopPropagation();
-      const jitter = (Math.random() - 0.5) * 0.2;
-      updateNote(note.id, { rotationZ: (note.rotationZ ?? 0) + jitter });
-    };
-
-    delBtn.addEventListener("click", onDelete);
-    rotBtn.addEventListener("click", onRotate);
-
+    // 버튼 각각에 붙이지 않고, 최상위 요소에서 한 번만 듣는다
+    obj.element.addEventListener("click", onClick);
     return () => {
-      delBtn.removeEventListener("click", onDelete);
-      rotBtn.removeEventListener("click", onRotate);
+      obj.element.removeEventListener("click", onClick);
     };
-  }, [delBtn, rotBtn, note.id, note.rotationZ, doRemove, updateNote]);
+  }, [obj.element, note.id, note.rotationZ, removeNote, updateNote]);
 
-  // === 직접 드래그 ===
+  // 직접 드래그 (textarea/버튼 제외)
   useEffect(() => {
     const isUI = (t: EventTarget | null) =>
       t instanceof HTMLTextAreaElement ||
@@ -257,13 +267,12 @@ const Note3DBase = ({ note }: Props) => {
     const startPos = new THREE.Vector3();
 
     const onPointerDown = (e: PointerEvent) => {
-      if (e.button !== 0) return; // 좌클릭만
-      if (isUI(e.target)) return; // UI 시작이면 드래그 X
+      if (e.button !== 0) return;
+      if (isUI(e.target)) return;
       dragging = true;
       sx = e.clientX;
       sy = e.clientY;
       startPos.copy(group.position);
-
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
       window.addEventListener("pointermove", onPointerMove);
       window.addEventListener("pointerup", onPointerUp, { once: true });
@@ -306,7 +315,7 @@ const Note3DBase = ({ note }: Props) => {
   return null;
 };
 
-// 텍스트는 비교에서 제외(IME/커서 보존)
+// 텍스트 변경은 비교에서 제외(IME/커서 보존)
 const areEqual = (prev: Props, next: Props) => {
   const a = prev.note,
     b = next.note;
