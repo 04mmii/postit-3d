@@ -1,15 +1,16 @@
-import { Fragment } from "react";
+import React from "react";
 import { useNotes } from "../contexts/NotesContext";
 import { Note3D } from "./Note3D";
 
-export function NotesLayer() {
+const NotesLayer: React.FC = () => {
   const { notes } = useNotes();
-
   return (
-    <Fragment>
-      {notes.map((n, i) => (
-        <Note3D key={`note-${n.id ?? `${n.createdAt}-${i}`}`} note={n} />
+    <>
+      {notes.map((n) => (
+        <Note3D key={n.id} note={n} />
       ))}
-    </Fragment>
+    </>
   );
-}
+};
+
+export default NotesLayer;

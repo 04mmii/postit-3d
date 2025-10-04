@@ -1,10 +1,10 @@
 import { ThreeRoot } from "./contexts/ThreeContext";
 import { NotesProvider } from "./contexts/NotesContext";
 import { Board } from "./components/Board";
-import { NotesLayer } from "./components/NotesLayer";
+import NotesLayer from "./components/NotesLayer";
 import { Toolbar } from "./components/Toolbar";
 
-export default function App() {
+export const App: React.FC = () => {
   return (
     <div className="relative w-full h-screen bg-[linear-gradient(180deg,#f7f4ed,#efe6d6)]">
       <NotesProvider>
@@ -16,4 +16,4 @@ export default function App() {
       </NotesProvider>
     </div>
   );
-}
+};

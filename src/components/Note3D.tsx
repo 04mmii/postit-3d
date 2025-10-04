@@ -1,4 +1,3 @@
-// src/components/Note3D.tsx
 import { memo, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer";
@@ -8,6 +7,7 @@ import { useNotes } from "../contexts/NotesContext";
 
 type Props = { note: Note };
 
+// 색
 const colorOf = (c: any) =>
   c === "yellow"
     ? "#FFF9C4"
@@ -17,7 +17,7 @@ const colorOf = (c: any) =>
         ? "#B2EBF2"
         : "#FFF9C4";
 
-/** DOM만 한 번 생성 */
+// DOM 한 번만 생성
 function buildNoteElement(note: Note) {
   const wrap = document.createElement("div");
   Object.assign(wrap.style, {
@@ -112,12 +112,12 @@ function buildNoteElement(note: Note) {
   const buttons = document.createElement("div");
   Object.assign(buttons.style, { display: "flex", gap: "6px" });
 
-  const mkBtn = (label: string, title: string, action: "rotate" | "delete") => {
+  const mkBtn = (label: string, title: string) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = label;
     btn.title = title;
-    btn.dataset.action = action; // ← 이벤트 위임용
+    btn.dataset.nodrag = "1";
     Object.assign(btn.style, {
       width: "28px",
       height: "28px",
@@ -128,14 +128,15 @@ function buildNoteElement(note: Note) {
       cursor: "pointer",
       pointerEvents: "auto",
     });
-    // 드래그로 안 끌려가게 pointerdown만 캡처에서 차단
-    const stop = (e: Event) => e.stopPropagation();
-    btn.addEventListener("pointerdown", stop, { capture: true });
+    // drag 이벤트로 안 올라가게 최소 차단
+    btn.addEventListener("pointerdown", (e) => e.stopPropagation(), {
+      capture: true,
+    });
     return btn;
   };
 
-  const rotBtn = mkBtn("↻", "살짝 기울이기", "rotate");
-  const delBtn = mkBtn("🗑️", "삭제", "delete");
+  const rotBtn = mkBtn("↻", "살짝 기울이기");
+  const delBtn = mkBtn("🗑️", "삭제");
   buttons.appendChild(rotBtn);
   buttons.appendChild(delBtn);
 
@@ -150,7 +151,7 @@ function buildNoteElement(note: Note) {
     shadow.style.boxShadow = "0 18px 30px rgba(0,0,0,.2201)";
   });
 
-  return { wrap, cardInner, textarea };
+  return { wrap, cardInner, textarea, delBtn, rotBtn };
 }
 
 const Note3DBase = ({ note }: Props) => {
@@ -159,18 +160,18 @@ const Note3DBase = ({ note }: Props) => {
 
   const composingRef = useRef(false);
 
-  // DOM/CSS3DObject 1회 생성
-  const { obj, cardInner, textarea } = useMemo(() => {
+  // CSS DOM
+  const { obj, cardInner, textarea, delBtn, rotBtn } = useMemo(() => {
     const dom = buildNoteElement(note);
     const obj = new CSS3DObject(dom.wrap);
     return { obj, ...dom };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 이동용 3D 그룹
+  // 개별 그룹 (다른 메모와 절대 공유 X)
   const group = useMemo(() => new THREE.Group(), []);
 
-  // 장면 등록/해제
+  // 장면 등록
   useEffect(() => {
     group.add(obj);
     group.position.set(
@@ -185,9 +186,9 @@ const Note3DBase = ({ note }: Props) => {
     return () => {
       scene.remove(group);
     };
-  }, [group, obj, scene, note.id, note.position, note.rotationZ]);
+  }, [group, obj, scene, note.id]); // 위치/회전은 아래 동기화 useEffect에서 반영
 
-  // note → view 반영 (IME 중엔 텍스트 덮어쓰기 금지)
+  // note -> view 동기화 (IME 중엔 text 덮어쓰기 금지)
   useEffect(() => {
     if (!composingRef.current && textarea.value !== (note.text ?? "")) {
       textarea.value = note.text ?? "";
@@ -201,7 +202,7 @@ const Note3DBase = ({ note }: Props) => {
     group.rotation.set(0, 0, note.rotationZ ?? 0);
   }, [note, group, cardInner, textarea]);
 
-  // 입력(IME 완전 대응)
+  // 입력 (IME 안전)
   useEffect(() => {
     const onCompStart = () => (composingRef.current = true);
     const onCompEnd = () => {
@@ -216,7 +217,6 @@ const Note3DBase = ({ note }: Props) => {
     textarea.addEventListener("compositionstart", onCompStart);
     textarea.addEventListener("compositionend", onCompEnd);
     textarea.addEventListener("input", onInput);
-
     return () => {
       textarea.removeEventListener("compositionstart", onCompStart);
       textarea.removeEventListener("compositionend", onCompEnd);
@@ -224,38 +224,26 @@ const Note3DBase = ({ note }: Props) => {
     };
   }, [note.id, textarea, updateNote]);
 
-  // 버튼: 이벤트 위임 (삭제/회전 둘 다 여기서 처리)
+  // 버튼 (삭제/회전)
   useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      const btn = target.closest(
-        "button[data-action]"
-      ) as HTMLButtonElement | null;
-      if (!btn) return;
-
+    const onDelete = (e: Event) => {
       e.stopPropagation();
-      const action = btn.dataset.action;
-
-      if (action === "delete") {
-        removeNote(note.id); // ✅ 확실히 호출
-        return;
-      }
-      if (action === "rotate") {
-        const jitter = (Math.random() - 0.5) * 0.2;
-        updateNote(note.id, { rotationZ: (note.rotationZ ?? 0) + jitter });
-        return;
-      }
+      removeNote(note.id);
     };
-
-    // 버튼 각각에 붙이지 않고, 최상위 요소에서 한 번만 듣는다
-    obj.element.addEventListener("click", onClick);
+    const onRotate = (e: Event) => {
+      e.stopPropagation();
+      const jitter = (Math.random() - 0.5) * 0.2;
+      updateNote(note.id, { rotationZ: (note.rotationZ ?? 0) + jitter });
+    };
+    delBtn.addEventListener("click", onDelete);
+    rotBtn.addEventListener("click", onRotate);
     return () => {
-      obj.element.removeEventListener("click", onClick);
+      delBtn.removeEventListener("click", onDelete);
+      rotBtn.removeEventListener("click", onRotate);
     };
-  }, [obj.element, note.id, note.rotationZ, removeNote, updateNote]);
+  }, [delBtn, rotBtn, note.id, note.rotationZ, removeNote, updateNote]);
 
-  // 직접 드래그 (textarea/버튼 제외)
+  // === 개별 드래그 (다른 메모에 영향 없음) ===
   useEffect(() => {
     const isUI = (t: EventTarget | null) =>
       t instanceof HTMLTextAreaElement ||
@@ -315,7 +303,7 @@ const Note3DBase = ({ note }: Props) => {
   return null;
 };
 
-// 텍스트 변경은 비교에서 제외(IME/커서 보존)
+// 텍스트는 비교에서 제외 (IME/커서 보존)
 const areEqual = (prev: Props, next: Props) => {
   const a = prev.note,
     b = next.note;
