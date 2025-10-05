@@ -4,7 +4,7 @@ import { Board } from "./components/Board";
 import NotesLayer from "./components/NotesLayer";
 import { Toolbar } from "./components/Toolbar";
 
-export const App: React.FC = () => {
+const App: React.FC = () => {
   return (
     <div className="relative w-full h-screen bg-[linear-gradient(180deg,#f7f4ed,#efe6d6)]">
       <NotesProvider>
@@ -17,3 +17,5 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+export default App;

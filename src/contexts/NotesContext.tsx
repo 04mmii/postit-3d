@@ -12,7 +12,7 @@ type NotesCtx = {
   notes: Note[];
   addNote: (note: Note) => void;
   updateNote: (id: string, patch: Partial<Note>) => void;
-  removeNote: (id: string) => void;
+  removeNote: (id: string) => void; // ← 통일
 };
 
 const Ctx = createContext<NotesCtx | null>(null);
@@ -20,7 +20,7 @@ const Ctx = createContext<NotesCtx | null>(null);
 export const NotesProvider: React.FC<React.PropsWithChildren<{}>> = ({
   children,
 }) => {
-  const didLoad = useRef(false);
+  const didLoadRef = useRef(false);
   const [notes, setNotes] = useState<Note[]>(() => {
     try {
       const raw = localStorage.getItem("notes");
@@ -30,15 +30,13 @@ export const NotesProvider: React.FC<React.PropsWithChildren<{}>> = ({
     }
   });
 
-  // 로컬스토리지 저장 (최초 마운트 이후부터)
+  // 저장 (최초 렌더 직후엔 저장 패스)
   useEffect(() => {
-    if (!didLoad.current) {
-      didLoad.current = true;
+    if (!didLoadRef.current) {
+      didLoadRef.current = true;
       return;
     }
-    try {
-      localStorage.setItem("notes", JSON.stringify(notes));
-    } catch {}
+    localStorage.setItem("notes", JSON.stringify(notes));
   }, [notes]);
 
   const addNote = useCallback((note: Note) => {
@@ -50,7 +48,7 @@ export const NotesProvider: React.FC<React.PropsWithChildren<{}>> = ({
   }, []);
 
   const removeNote = useCallback((id: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    setNotes((prev) => prev.filter((n) => n.id === id));
   }, []);
 
   return (
