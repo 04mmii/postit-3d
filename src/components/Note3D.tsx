@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer";
 import type { Note } from "../types/note";
@@ -298,7 +298,7 @@ const Note3DBase: React.FC<Props> = ({ note }) => {
     const onMove = (e: PointerEvent) => {
       if (!dragging) return;
       if (pid !== null && e.pointerId !== pid) return;
-      if (pointerId !== null && e.pointerId !== pointerId) return;
+
       const dx = e.clientX - sx;
       const dy = e.clientY - sy;
       const distance = Math.abs(camera.position.z - group.position.z);
@@ -310,7 +310,7 @@ const Note3DBase: React.FC<Props> = ({ note }) => {
       group.position.y = startPos.y - dy * worldPerPixelY;
     };
 
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
       if (pid !== null && e.pointerId !== pid) return;
       if (dragging) {
         const p = group.position;
