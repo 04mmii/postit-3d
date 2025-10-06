@@ -1,6 +1,6 @@
 import { useNotes } from "../contexts/NotesContext";
 
-export function Toolbar() {
+export const Toolbar: React.FC = () => {
   const { addNote } = useNotes();
   return (
     <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-auto font-sans">
@@ -37,4 +37,4 @@ export function Toolbar() {
       </div>
     </div>
   );
-}
+};

@@ -1,10 +1,8 @@
-import React from "react";
 import { useNotes } from "../contexts/NotesContext";
-import { Note3D } from "./Note3D";
+import Note3D from "./Note3D";
 
 const NotesLayer: React.FC = () => {
   const { notes } = useNotes();
-
   return (
     <>
       {notes.map((n) => (

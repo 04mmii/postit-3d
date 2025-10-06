@@ -1,9 +1,11 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { CSS3DObject } from "three/examples/jsm/renderers/CSS3DRenderer";
 import type { Note } from "../types/note";
 import { useThree } from "../contexts/ThreeContext";
 import { useNotes } from "../contexts/NotesContext";
+
+let __zCounter = 1;
 
 type Props = { note: Note };
 
@@ -16,9 +18,9 @@ const colorOf = (c: any) =>
         ? "#B2EBF2"
         : "#FFF9C4";
 
-// DOM 1회만 생성 (note.id 기준)
-const buildNoteElement = (note: Note) => {
+function buildNoteElement(note: Note) {
   const wrap = document.createElement("div");
+  wrap.setAttribute("draggable", "false");
   Object.assign(wrap.style, {
     position: "relative",
     width: "220px",
@@ -27,6 +29,7 @@ const buildNoteElement = (note: Note) => {
     backfaceVisibility: "hidden",
     pointerEvents: "auto",
     userSelect: "none",
+    touchAction: "none",
   });
 
   const card = document.createElement("div");
@@ -47,7 +50,6 @@ const buildNoteElement = (note: Note) => {
     display: "flex",
     flexDirection: "column",
     gap: "8px",
-    pointerEvents: "auto",
   });
 
   const shadow = document.createElement("div");
@@ -81,6 +83,7 @@ const buildNoteElement = (note: Note) => {
   });
 
   const textarea = document.createElement("textarea");
+  textarea.setAttribute("draggable", "false");
   textarea.value = note.text ?? "";
   textarea.placeholder = "할 일을 적어보세요…";
   Object.assign(textarea.style, {
@@ -95,7 +98,6 @@ const buildNoteElement = (note: Note) => {
     userSelect: "text",
     pointerEvents: "auto",
   });
-  textarea.dataset.ui = "1";
 
   const footer = document.createElement("div");
   Object.assign(footer.style, {
@@ -115,10 +117,11 @@ const buildNoteElement = (note: Note) => {
 
   const mkBtn = (label: string, title: string) => {
     const btn = document.createElement("button");
+    btn.setAttribute("draggable", "false");
     btn.type = "button";
     btn.textContent = label;
     btn.title = title;
-    btn.dataset.ui = "1";
+    btn.dataset.nodrag = "1";
     Object.assign(btn.style, {
       width: "28px",
       height: "28px",
@@ -128,17 +131,17 @@ const buildNoteElement = (note: Note) => {
       border: "1px solid #ccc",
       cursor: "pointer",
       pointerEvents: "auto",
-      zIndex: "10",
     });
-    const stop = (e: Event) => e.stopPropagation();
-    btn.addEventListener("pointerdown", stop, { capture: true });
-    btn.addEventListener("mousedown", stop, { capture: true });
-    btn.addEventListener("click", stop, { capture: true });
+    // 드래그 시작만 캡처에서 차단 (click 은 살린다)
+    btn.addEventListener("pointerdown", (e) => e.stopPropagation(), {
+      capture: true,
+    });
     return btn;
   };
 
   const rotBtn = mkBtn("↻", "살짝 기울이기");
   const delBtn = mkBtn("🗑️", "삭제");
+
   buttons.appendChild(rotBtn);
   buttons.appendChild(delBtn);
 
@@ -154,71 +157,48 @@ const buildNoteElement = (note: Note) => {
   });
 
   return { wrap, cardInner, textarea, delBtn, rotBtn };
-};
+}
 
 const Note3DBase: React.FC<Props> = ({ note }) => {
   const { scene, camera, mountEl } = useThree();
   const { updateNote, removeNote } = useNotes();
   const composingRef = useRef(false);
 
-  // 그룹 고유화 (ref 한 번만 생성)
-  const groupRef = useRef<THREE.Group | null>(null);
-
-  // 오브젝트/DOM는 note.id 바뀔 때만 생성
   const { obj, cardInner, textarea, delBtn, rotBtn } = useMemo(() => {
     const dom = buildNoteElement(note);
     const obj = new CSS3DObject(dom.wrap);
     return { obj, ...dom };
-  }, [note.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // 그룹 등록 해제는 한 곳에서만 한다!!!
+  const group = useMemo(() => new THREE.Group(), []);
+
   useEffect(() => {
-    if (!groupRef.current) groupRef.current = new THREE.Group();
-    const group = groupRef.current;
-    group.clear();
     group.add(obj);
-
     group.position.set(
       note.position?.x ?? 0,
       note.position?.y ?? 0,
       note.position?.z ?? 0
     );
     group.rotation.set(0, 0, note.rotationZ ?? 0);
-
-    (group as any).userData.noteId = note.id;
     scene.add(group);
+    return () => void scene.remove(group);
+  }, [group, obj, scene, note.position, note.rotationZ]);
 
-    return () => {
-      scene.remove(group);
-      group.clear();
-    };
-  }, [scene, obj, note.id]);
-
-  // note 변경 -> 화면 갱신
   useEffect(() => {
-    const group = groupRef.current!;
-    group.position.set(
-      note.position?.x ?? 0,
-      note.position?.y ?? 0,
-      note.position?.z ?? 0
-    );
-    group.rotation.set(0, 0, note.rotationZ ?? 0);
-    cardInner.style.background = colorOf(note.color);
     if (!composingRef.current && textarea.value !== (note.text ?? "")) {
       textarea.value = note.text ?? "";
     }
-  }, [
-    note.position?.x,
-    note.position?.y,
-    note.position?.z,
-    note.rotationZ,
-    note.color,
-    note.text,
-    cardInner,
-    textarea,
-  ]);
+    cardInner.style.background = colorOf(note.color);
+    group.position.set(
+      note.position?.x ?? 0,
+      note.position?.y ?? 0,
+      note.position?.z ?? 0
+    );
+    group.rotation.set(0, 0, note.rotationZ ?? 0);
+  }, [note, group, cardInner, textarea]);
 
-  // IME 입력 관리
+  // 입력 저장(IME 완전 지원)
   useEffect(() => {
     const onCompStart = () => (composingRef.current = true);
     const onCompEnd = () => {
@@ -239,56 +219,88 @@ const Note3DBase: React.FC<Props> = ({ note }) => {
     };
   }, [note.id, textarea, updateNote]);
 
-  // 삭제/회전
+  // 버튼: click 으로 확실히 처리
   useEffect(() => {
-    const onDelete = (e: Event) => {
+    const onDelete = (e: MouseEvent) => {
       e.stopPropagation();
+      // 1) 상태 제거
       removeNote(note.id);
+      // 2) 혹시 상태 반영이 늦거나 실패해도 씬에서 즉시 제거 (겹침/클릭 막기)
+      try {
+        scene.remove(group);
+        group.clear();
+        // DOM도 안전하게 제거
+        if (obj.element?.parentElement) {
+          obj.element.parentElement.removeChild(obj.element);
+        }
+      } catch {}
     };
-    const onRotate = (e: Event) => {
+
+    const onRotate = (e: MouseEvent) => {
       e.stopPropagation();
+      e.preventDefault();
       const jitter = (Math.random() - 0.5) * 0.2;
       updateNote(note.id, { rotationZ: (note.rotationZ ?? 0) + jitter });
     };
     delBtn.addEventListener("click", onDelete);
-    delBtn.addEventListener("pointerup", onDelete as any);
     rotBtn.addEventListener("click", onRotate);
-    rotBtn.addEventListener("pointerup", onRotate as any);
     return () => {
       delBtn.removeEventListener("click", onDelete);
-      delBtn.removeEventListener("pointerup", onDelete as any);
       rotBtn.removeEventListener("click", onRotate);
-      rotBtn.removeEventListener("pointerup", onRotate as any);
     };
   }, [delBtn, rotBtn, note.id, note.rotationZ, removeNote, updateNote]);
 
-  // 직접 드래그
+  // 카드 하나만 드래그
   useEffect(() => {
     const isUI = (t: EventTarget | null) =>
-      t instanceof HTMLElement && t.closest('[data-ui="1"]');
+      t instanceof HTMLTextAreaElement ||
+      (t instanceof HTMLElement && t.closest("button"));
+
     let dragging = false;
+    let pid: number | null = null;
+    let pointerId: number | null = null;
     let sx = 0,
       sy = 0;
     const startPos = new THREE.Vector3();
 
-    const onPointerDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      if (isUI(e.target)) return;
-      dragging = true;
-      sx = e.clientX;
-      sy = e.clientY;
-      const group = groupRef.current!;
-      startPos.copy(group.position);
-      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-      window.addEventListener("pointermove", onPointerMove);
-      window.addEventListener("pointerup", onPointerUp, { once: true });
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      dragging = false;
+      pid = null; // ⬅️ 해제
     };
 
-    const onPointerMove = (e: PointerEvent) => {
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      if (isUI(e.target)) return;
+
+      // 맨 앞으로 올리기 (CSS3D는 DOM 순서/ z-index에 영향 큼)
+      try {
+        // 시각적 최전면
+        (obj.element as HTMLElement).style.zIndex = String(++__zCounter);
+        // 살짝 띄워서 z-fighting 방지 (원근 반영)
+        group.position.z += 0.001;
+      } catch {}
+
+      dragging = true;
+      pid = e.pointerId;
+      sx = e.clientX;
+      sy = e.clientY;
+      startPos.copy(group.position);
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onCancel);
+    };
+
+    const onMove = (e: PointerEvent) => {
       if (!dragging) return;
+      if (pid !== null && e.pointerId !== pid) return;
+      if (pointerId !== null && e.pointerId !== pointerId) return;
       const dx = e.clientX - sx;
       const dy = e.clientY - sy;
-      const group = groupRef.current!;
       const distance = Math.abs(camera.position.z - group.position.z);
       const fovRad = (camera.fov * Math.PI) / 180;
       const worldPerPixelY =
@@ -298,33 +310,31 @@ const Note3DBase: React.FC<Props> = ({ note }) => {
       group.position.y = startPos.y - dy * worldPerPixelY;
     };
 
-    const onPointerUp = () => {
-      if (!dragging) return;
-      dragging = false;
-      window.removeEventListener("pointermove", onPointerMove);
-      const group = groupRef.current!;
-      const p = group.position;
-      updateNote(note.id, {
-        position: { x: p.x, y: p.y, z: p.z },
-        rotationZ: group.rotation.z,
-      });
+    const onUp = () => {
+      if (pid !== null && e.pointerId !== pid) return;
+      if (dragging) {
+        const p = group.position;
+        updateNote(note.id, {
+          position: { x: p.x, y: p.y, z: p.z },
+          rotationZ: group.rotation.z,
+        });
+      }
+      cleanup();
     };
 
-    obj.element.addEventListener("pointerdown", onPointerDown);
+    const onCancel = () => cleanup();
 
+    obj.element.addEventListener("pointerdown", onDown);
     return () => {
-      obj.element.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
+      obj.element.removeEventListener("pointerdown", onDown);
+      cleanup();
     };
-  }, [obj.element, camera, mountEl, note.id, updateNote]);
+  }, [obj.element, group, camera, mountEl, note.id, updateNote]);
 
   return null;
 };
 
-// areEqual: 삭제/생성엔 무조건 false
 const areEqual = (prev: Props, next: Props) => {
-  if (!prev.note || !next.note) return false;
   const a = prev.note,
     b = next.note;
   return (
@@ -337,4 +347,5 @@ const areEqual = (prev: Props, next: Props) => {
   );
 };
 
-export const Note3D = memo(Note3DBase, areEqual);
+const Note3D = memo(Note3DBase, areEqual);
+export default Note3D;
