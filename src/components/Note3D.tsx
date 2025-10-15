@@ -258,7 +258,6 @@ const Note3DBase: React.FC<Props> = ({ note }) => {
 
     let dragging = false;
     let pid: number | null = null;
-    let pointerId: number | null = null;
     let sx = 0,
       sy = 0;
     const startPos = new THREE.Vector3();
