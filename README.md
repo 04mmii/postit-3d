@@ -50,15 +50,15 @@ src/
   App.tsx
   main.tsx
 
-ThreeContext: three.js Scene, Camera, CSS3DRenderer를 만들고 렌더 루프 관리
-NotesContext: notes 배열을 관리하고 localStorage에 동기화
-Note3D: DOM을 만들어 CSS3DObject로 감싸고, 그룹(THREE.Group)을 드래그/회전/편집 이벤트와 연결
-NotesLayer: 여러 Note3D를 렌더링하고, 드래그/저장 타이밍을 제어
+- ThreeContext: three.js Scene, Camera, CSS3DRenderer를 만들고 렌더 루프 관리
+- NotesContext: notes 배열을 관리하고 localStorage에 동기화
+- Note3D: DOM을 만들어 CSS3DObject로 감싸고, 그룹(THREE.Group)을 드래그/회전/편집 이벤트와 연결
+- NotesLayer: 여러 Note3D를 렌더링하고, 드래그/저장 타이밍을 제어
 
 ## 🧩 구현 메모
 
-CSS3DRenderer: <div>, <textarea> 같은 실제 DOM을 3D 공간에 배치합니다.
-드래그: 화면 픽셀 → 월드 좌표 변환해서 그룹 위치를 갱신하고, pointerup에 최종 위치를 저장합니다.
-IME(한글): compositionstart/end 이벤트로 조합 중에는 저장을 지연합니다.
-이벤트 충돌 방지: 버튼과 텍스트영역은 캡처 단계에서 stopPropagation()으로 드래그 시작을 막습니다.
-퍼시스턴스: NotesContext가 notes 상태를 localStorage에 자동으로 저장합니다.
+- CSS3DRenderer: <div>, <textarea> 같은 실제 DOM을 3D 공간에 배치합니다.
+- 드래그: 화면 픽셀 → 월드 좌표 변환해서 그룹 위치를 갱신하고, pointerup에 최종 위치를 저장합니다.
+- IME(한글): compositionstart/end 이벤트로 조합 중에는 저장을 지연합니다.
+- 이벤트 충돌 방지: 버튼과 텍스트영역은 캡처 단계에서 stopPropagation()으로 드래그 시작을 막습니다.
+- 퍼시스턴스: NotesContext가 notes 상태를 localStorage에 자동으로 저장합니다.
