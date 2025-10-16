@@ -34,21 +34,10 @@ React + TypeScript + Three.js (CSS3D) 기반으로, IME(한글) 입력 안정성
 | `npm run format`  | Prettier 포맷         |
 
 
-## 📁 프로젝트 구조(요지)
+## 📁 프로젝트 구조
 
-src/
-  components/
-    Board.tsx          # 배경 보드
-    NotesLayer.tsx     # 메모 목록/드래그 관리
-    Note3D.tsx         # 단일 메모(3D DOM)
-    Toolbar.tsx        # 상단 툴바(추가/색상)
-  contexts/
-    ThreeContext.tsx   # scene/camera/renderer 제공
-    NotesContext.tsx   # 노트 CRUD + localStorage
-  types/
-    note.ts            # Note 타입
-  App.tsx
-  main.tsx
+![프로젝트 구조](https://github.com/user-attachments/assets/0e17383c-08c4-4815-8d67-b41629432d0d)
+
 
 - ThreeContext: three.js Scene, Camera, CSS3DRenderer를 만들고 렌더 루프 관리
 - NotesContext: notes 배열을 관리하고 localStorage에 동기화
