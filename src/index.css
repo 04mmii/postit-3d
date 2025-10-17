@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* 선택: 프로젝트 색상 등 테마 확장 */
+@theme {
+  --color-postit-yellow: #fff9c4;
+  --color-postit-pink: #f8bbd0;
+  --color-postit-mint: #b2ebf2;
+}
 * {
   box-sizing: border-box;
 }

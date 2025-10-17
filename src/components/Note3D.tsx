@@ -49,7 +49,7 @@ function buildNoteElement(note: Note) {
     boxShadow: "0 18px 30px rgba(0,0,0,.22)",
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: "9px",
   });
 
   const shadow = document.createElement("div");
