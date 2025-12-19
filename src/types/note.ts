@@ -7,6 +7,7 @@ export type Note = {
   createdAt?: number;
   position?: { x: number; y: number; z: number };
   rotationZ?: number;
+  completed?: boolean;
 };
 
 /** 새 메모 기본값 생성기: addNote에서 이 함수로 항상 완전한 Note를 만든다 */

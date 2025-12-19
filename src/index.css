@@ -20,3 +20,58 @@ body {
 textarea {
   font-family: inherit;
 }
+
+/* ========================================
+   포스트잇 애니메이션 시스템
+   ======================================== */
+
+/* 기본 포스트잇 카드 트랜지션 */
+.note-card {
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease-out;
+  will-change: transform, box-shadow;
+  backface-visibility: hidden;
+}
+
+/* 드래그 중에는 트랜지션 비활성화 */
+.note-card.dragging {
+  transition: none;
+}
+
+/* 들림 효과 (드래그 시작) */
+.note-card.lifted {
+  transform: scale(1.03) translateZ(15px);
+  box-shadow:
+    0 25px 50px rgba(0,0,0,0.22),
+    0 10px 20px rgba(0,0,0,0.15);
+}
+
+/* 호버 효과 (미세한 들림) */
+.note-card:hover:not(.dragging):not(.lifted) {
+  transform: translateZ(5px) scale(1.008);
+  box-shadow:
+    0 22px 40px rgba(0,0,0,0.18),
+    0 8px 16px rgba(0,0,0,0.12);
+}
+
+/* 그림자 레이어 트랜지션 */
+.shadow-layer {
+  transition: box-shadow 0.25s ease-out;
+}
+
+/* 테이프 하이라이트 애니메이션 */
+.tape-shine {
+  background: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgba(255,255,255,0.4) 50%,
+    transparent 70%
+  );
+  animation: tapeShimmer 3s ease-in-out infinite;
+}
+
+@keyframes tapeShimmer {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
