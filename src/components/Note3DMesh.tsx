@@ -14,6 +14,9 @@ type Props = {
 // z-index 관리
 let __zCounter = 1;
 
+// 전역 드래그 잠금 (한 번에 하나의 카드만 드래그)
+let __globalDragLock = false;
+
 /**
  * 굴곡진 포스트잇 Geometry 생성
  * 하단이 살짝 들린 효과
@@ -43,7 +46,7 @@ function createCurledPlaneGeometry(
 }
 
 const Note3DMeshBase: React.FC<Props> = ({ note, onSelect, isSelected }) => {
-  const { scene, camera, raycaster, mountEl, getMouseNDC, registerMesh, unregisterMesh } = useThree();
+  const { scene, camera, raycaster, mountEl, getMouseNDC, registerMesh, unregisterMesh, getAllMeshes } = useThree();
   const { updateNote } = useNotes();
 
   const meshRef = useRef<THREE.Mesh | null>(null);
@@ -134,14 +137,24 @@ const Note3DMeshBase: React.FC<Props> = ({ note, onSelect, isSelected }) => {
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       if (isDragging) return; // 이미 드래그 중이면 무시
+      if (__globalDragLock) return; // 다른 카드가 드래그 중이면 무시
 
       const mouse = getMouseNDC(e);
       raycaster.setFromCamera(mouse, camera);
 
-      const intersects = raycaster.intersectObject(mesh);
-      if (intersects.length === 0) return;
+      // 모든 메시에 대해 레이캐스트하여 가장 위에 있는 카드 찾기
+      const allMeshes = getAllMeshes();
+      const allIntersects = raycaster.intersectObjects(allMeshes);
+
+      // 클릭된 것이 없거나, 이 메시가 가장 위가 아니면 무시
+      if (allIntersects.length === 0) return;
+      if (allIntersects[0].object !== mesh) return;
 
       e.stopPropagation();
+      e.preventDefault();
+
+      // 전역 잠금 획득
+      __globalDragLock = true;
 
       // 클릭 감지
       isDragging = true;
@@ -211,6 +224,7 @@ const Note3DMeshBase: React.FC<Props> = ({ note, onSelect, isSelected }) => {
       isDragging = false;
       dragStarted = false;
       pointerId = null;
+      __globalDragLock = false; // 전역 잠금 해제
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
@@ -222,7 +236,7 @@ const Note3DMeshBase: React.FC<Props> = ({ note, onSelect, isSelected }) => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
-  }, [mountEl, camera, raycaster, getMouseNDC, note.id, updateNote, onSelect]);
+  }, [mountEl, camera, raycaster, getMouseNDC, getAllMeshes, note.id, updateNote, onSelect]);
 
   // 선택 시 강조 효과 (MeshBasicMaterial용)
   useEffect(() => {

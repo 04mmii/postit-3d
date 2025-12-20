@@ -232,7 +232,7 @@ export function updateNoteTexture(
 
   if (text) {
     ctx.fillStyle = completed ? "rgba(0, 0, 0, 0.5)" : "#000000";
-    ctx.font = "bold 48px ui-sans-serif, system-ui, -apple-system, sans-serif";
+    ctx.font = "bold 40px ui-sans-serif, system-ui, -apple-system, sans-serif";
     ctx.textBaseline = "top";
 
     const lines = wrapText(ctx, text, maxWidth);
