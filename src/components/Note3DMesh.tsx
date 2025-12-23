@@ -4,6 +4,7 @@ import type { Note } from "../types/note";
 import { useThree } from "../contexts/ThreeContext";
 import { useNotes } from "../contexts/NotesContext";
 import { createNoteTexture, updateNoteTexture } from "../utils/createNoteTexture";
+import { createCurledPlaneGeometry } from "../utils/createCurledGeometry";
 
 type Props = {
   note: Note;
@@ -16,34 +17,6 @@ let __zCounter = 1;
 
 // 전역 드래그 잠금 (한 번에 하나의 카드만 드래그)
 let __globalDragLock = false;
-
-/**
- * 굴곡진 포스트잇 Geometry 생성
- * 하단이 살짝 들린 효과
- */
-function createCurledPlaneGeometry(
-  width: number,
-  height: number,
-  curlAmount: number,
-  segments = 16
-): THREE.PlaneGeometry {
-  const geometry = new THREE.PlaneGeometry(width, height, segments, segments);
-  const positions = geometry.attributes.position;
-
-  for (let i = 0; i < positions.count; i++) {
-    const y = positions.getY(i);
-    // 상단(접착부분)은 평평하게, 하단으로 갈수록 들림
-    const normalizedY = (y + height / 2) / height; // 0(하단) ~ 1(상단)
-    // 하단이 들리도록 (상단은 0, 하단은 curlAmount)
-    const curl = Math.pow(1 - normalizedY, 2) * curlAmount;
-    positions.setZ(i, curl);
-  }
-
-  positions.needsUpdate = true;
-  geometry.computeVertexNormals();
-
-  return geometry;
-}
 
 const Note3DMeshBase: React.FC<Props> = ({ note, onSelect, isSelected }) => {
   const { scene, camera, raycaster, mountEl, getMouseNDC, registerMesh, unregisterMesh, getAllMeshes } = useThree();

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import * as THREE from "three";
 import type { Note, NoteColor } from "../types/note";
 import { useThree } from "../contexts/ThreeContext";
 import { useNotes } from "../contexts/NotesContext";
-import { COLORS, COLORS_80 } from "../utils/colors";
+import { COLORS_80 } from "../utils/colors";
+import { projectToScreen } from "../utils/projectToScreen";
+import { NoteActionButtons, CheckboxButton } from "./NoteActionButtons";
 
 type Props = {
   note: Note;
@@ -11,23 +12,6 @@ type Props = {
 };
 
 const colorCycleOrder: NoteColor[] = ["yellow", "pink", "mint"];
-
-/**
- * 3D 좌표를 2D 화면 좌표로 변환
- */
-function projectToScreen(
-  position: THREE.Vector3,
-  camera: THREE.PerspectiveCamera,
-  container: HTMLElement
-): { x: number; y: number } {
-  const vector = position.clone();
-  vector.project(camera);
-
-  return {
-    x: ((vector.x + 1) / 2) * container.clientWidth,
-    y: ((-vector.y + 1) / 2) * container.clientHeight,
-  };
-}
 
 /**
  * HTML 텍스트 입력 오버레이
@@ -186,32 +170,10 @@ export const NoteTextOverlay: React.FC<Props> = ({ note, onClose }) => {
           }}
         >
           {/* 체크박스 */}
-          <button
+          <CheckboxButton
+            checked={note.completed ?? false}
             onClick={handleToggleComplete}
-            title={note.completed ? "완료 취소" : "완료 표시"}
-            style={{
-              width: "28px",
-              height: "28px",
-              minWidth: "28px",
-              borderRadius: "6px",
-              border: note.completed
-                ? "2px solid #388E3C"
-                : "2px solid rgba(0,0,0,0.25)",
-              background: note.completed ? "#4CAF50" : "rgba(255,255,255,0.95)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "18px",
-              color: "#fff",
-              fontWeight: "bold",
-              padding: 0,
-              marginTop: "2px",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-            }}
-          >
-            {note.completed ? "✓" : ""}
-          </button>
+          />
 
           {/* 텍스트 입력 - 투명 배경 */}
           <textarea
@@ -238,56 +200,11 @@ export const NoteTextOverlay: React.FC<Props> = ({ note, onClose }) => {
           />
         </div>
 
-        {/* 하단 버튼 영역 - 호버 시 나타남 */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: "-40px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            display: "flex",
-            gap: "8px",
-            background: "rgba(255,255,255,0.95)",
-            padding: "6px 12px",
-            borderRadius: "20px",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.15)",
-          }}
-        >
-          {/* 색상 변경 */}
-          <button
-            onClick={handleColorChange}
-            title="색상 변경"
-            style={{
-              width: "28px",
-              height: "28px",
-              borderRadius: "50%",
-              border: "1px solid rgba(0,0,0,0.15)",
-              background: `linear-gradient(135deg, ${COLORS.yellow} 0%, ${COLORS.pink} 50%, ${COLORS.mint} 100%)`,
-              cursor: "pointer",
-            }}
-          />
-
-          {/* 삭제 */}
-          <button
-            onClick={handleDelete}
-            title="삭제"
-            style={{
-              width: "28px",
-              height: "28px",
-              borderRadius: "50%",
-              border: "1px solid rgba(0,0,0,0.15)",
-              background: "rgba(255,255,255,0.9)",
-              cursor: "pointer",
-              fontSize: "16px",
-              color: "#d32f2f",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ×
-          </button>
-        </div>
+        {/* 하단 액션 버튼 */}
+        <NoteActionButtons
+          onColorChange={handleColorChange}
+          onDelete={handleDelete}
+        />
       </div>
     </div>
   );
