@@ -111,10 +111,11 @@ for (let i = 0; i < positions.count; i++) {
 ### 2. Raycaster 기반 3D 인터랙션
 
 ```typescript
-// 모든 메시에서 가장 위에 있는 카드만 선택
+// 겹친 카드 중 최상위 카드만 선택 + 선택 시 맨 위로 이동
 const allIntersects = raycaster.intersectObjects(allMeshes);
-if (allIntersects[0].object === targetMesh) {
-  // 선택된 카드 처리
+if (allIntersects[0].object === mesh) {
+  // 선택된 카드를 맨 위로 (z-index 증가)
+  mesh.position.z = baseZ + 0.01 * (++zCounter);
 }
 ```
 
